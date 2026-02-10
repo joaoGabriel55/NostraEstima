@@ -1,4 +1,4 @@
-# 🃏 NostraEstima App
+# 🃏 PokerEstima App
 
 > Estimate your tasks with fun! A real-time planning poker application for agile teams.
 
