@@ -4,7 +4,6 @@ import { createServer } from "http";
 import { dirname, join } from "path";
 import { Server } from "socket.io";
 import { fileURLToPath } from "url";
-import serverless from "serverless-http";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -355,5 +354,3 @@ function getSanitizedMembers(room) {
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
-
-export const handler = serverless(app);
