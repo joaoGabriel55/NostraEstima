@@ -1,9 +1,8 @@
 # 🃏 PokerEstima App
 
-<img width="1346" height="677" alt="image" src="https://github.com/user-attachments/assets/6b0f8c92-d532-4576-ad4e-5e4bd32690e8" />
+<img width="1593" height="709" alt="image" src="https://github.com/user-attachments/assets/7c7decfa-3720-4672-83ec-c85b2f556a3a" />
 
-<img width="1059" height="1254" alt="image" src="https://github.com/user-attachments/assets/0b82ff8d-7876-4d10-b28d-8685581a0b5c" />
-
+<img width="1167" height="1257" alt="image" src="https://github.com/user-attachments/assets/486cb79c-c0f7-4741-ab72-0450770eadeb" />
 
 > Estimate your tasks with fun! A real-time planning poker application for agile teams.
 
