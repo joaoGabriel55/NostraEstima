@@ -1,5 +1,10 @@
 # 🃏 NostraEstima App
 
+<img width="1346" height="677" alt="image" src="https://github.com/user-attachments/assets/6b0f8c92-d532-4576-ad4e-5e4bd32690e8" />
+
+<img width="1059" height="1254" alt="image" src="https://github.com/user-attachments/assets/0b82ff8d-7876-4d10-b28d-8685581a0b5c" />
+
+
 > Estimate your tasks with fun! A real-time planning poker application for agile teams.
 
 ![Planning Poker](https://img.shields.io/badge/Planning-Poker-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=)
