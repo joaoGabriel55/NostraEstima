@@ -48,7 +48,7 @@
           <p>Estimate your tasks with fun!</p>
         </header>
 
-        <% if (room && isNewUser) { %>
+        <% if (room && !userSession) { %>
           <!-- Join Room Form (for users joining via link) -->
           <div id="join-room-form" class="container">
             <div class="task-section">
@@ -74,7 +74,7 @@
 
         <% if (room) { %>
           <!-- Plan Poker Room Content -->
-          <div id="plan-poker-content" class="container" style="<%= isNewUser ? 'display: none;' : '' %>">
+          <div id="plan-poker-content" class="container" style="<%= !userSession ? 'display: none;' : '' %>">
             <!-- Room Info Bar -->
             <div class="room-info-bar">
               <div class="room-link-section">
@@ -206,7 +206,15 @@
               taskDescription: "<%= (room.taskDescription || '').replace(/"/g, '&quot;').replace(/\n/g, '\\n') %>",
               adminName: "<%= room.adminName %>"
             };
-            window.IS_NEW_USER = <%= isNewUser %>;
+            <% if (userSession) { %>
+            window.USER_SESSION = {
+              userName: "<%= userSession.name %>",
+              isAdmin: <%= userSession.isAdmin || false %>,
+              adminToken: "<%= userSession.adminToken ? userSession.adminToken : '' %>"
+            };
+            <% } else { %>
+            window.USER_SESSION = null;
+            <% } %>
           </script>
         <% } else { %>
           <!-- Create New Room Form -->
@@ -257,7 +265,7 @@
 
           <script>
             window.ROOM_DATA = null;
-            window.IS_NEW_USER = false;
+            window.USER_SESSION = null;
           </script>
         <% } %>
       </main>

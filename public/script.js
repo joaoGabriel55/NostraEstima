@@ -58,20 +58,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Initialize room
 function initializeRoom() {
-  // Check URL params for admin token and name
-  const urlParams = new URLSearchParams(window.location.search);
-  const adminTokenParam = urlParams.get("admin");
-  const nameParam = urlParams.get("name");
-
-  if (adminTokenParam && nameParam) {
-    // This is the admin who just created the room
-    adminToken = adminTokenParam;
-    userName = nameParam;
-    sessionStorage.setItem(`adminToken_${roomId}`, adminToken);
+  // Check if server provided session data (user already in session)
+  if (window.USER_SESSION) {
+    // User already has a session - use server-provided data
+    userName = window.USER_SESSION.userName;
+    adminToken = window.USER_SESSION.adminToken || null;
+    
+    // Store in sessionStorage for reconnection purposes
+    if (adminToken) {
+      sessionStorage.setItem(`adminToken_${roomId}`, adminToken);
+    }
     sessionStorage.setItem(`userName_${roomId}`, userName);
 
-    // Clean up URL
-    window.history.replaceState({}, document.title, `/play/${roomId}`);
+    // Clean up URL if there are query params
+    if (window.location.search) {
+      window.history.replaceState({}, document.title, `/play/${roomId}`);
+    }
 
     // Show the poker content directly
     if (joinRoomForm) joinRoomForm.style.display = "none";
@@ -79,19 +81,9 @@ function initializeRoom() {
 
     // Connect to WebSocket
     connectSocket();
-  } else if (window.IS_NEW_USER) {
-    // User joining via link - show join form
-    setupJoinForm();
   } else {
-    // Check if we have stored credentials
-    adminToken = sessionStorage.getItem(`adminToken_${roomId}`);
-    userName = sessionStorage.getItem(`userName_${roomId}`);
-
-    if (userName) {
-      if (joinRoomForm) joinRoomForm.style.display = "none";
-      if (planPokerContent) planPokerContent.style.display = "block";
-      connectSocket();
-    }
+    // New user - show join form (server already rendered it visible)
+    setupJoinForm();
   }
 
   // Setup room link
@@ -126,8 +118,11 @@ function initializeRoom() {
   }
 }
 
-// Setup join form
+// Setup join form for new users
 function setupJoinForm() {
+  // Connect to socket first (needed for new user flow)
+  connectSocket();
+
   if (joinRoomBtn) {
     joinRoomBtn.addEventListener("click", () => {
       const name = joinPlayerName.value.trim();
@@ -137,14 +132,12 @@ function setupJoinForm() {
       }
 
       userName = name;
-      sessionStorage.setItem(`userName_${roomId}`, userName);
 
-      // Hide join form, show poker content
-      joinRoomForm.style.display = "none";
-      planPokerContent.style.display = "block";
-
-      // Connect to WebSocket
-      connectSocket();
+      // Use server-side join with name (creates session on server)
+      socket.emit("room:joinWithName", {
+        roomId: roomId,
+        name: userName,
+      });
     });
 
     // Allow Enter key to submit
@@ -163,12 +156,15 @@ function connectSocket() {
   socket.on("connect", () => {
     console.log("Connected to server");
 
-    // Join the room
-    socket.emit("room:join", {
-      roomId: roomId,
-      name: userName,
-      adminToken: adminToken,
-    });
+    // Only auto-join if user has session data (not new user)
+    if (window.USER_SESSION) {
+      socket.emit("room:join", {
+        roomId: roomId,
+        name: userName,
+        adminToken: adminToken,
+      });
+    }
+    // For new users, they will use room:joinWithName after entering their name
   });
 
   // Room joined successfully
@@ -176,6 +172,15 @@ function connectSocket() {
     console.log("Joined room:", data);
     isAdmin = data.isAdmin;
     userName = data.userName;
+    
+    // Store adminToken if provided (for admin users)
+    if (data.isAdmin && window.USER_SESSION?.adminToken) {
+      adminToken = window.USER_SESSION.adminToken;
+    }
+
+    // Update UI - show poker content, hide join form
+    if (joinRoomForm) joinRoomForm.style.display = "none";
+    if (planPokerContent) planPokerContent.style.display = "block";
 
     // Update UI with room data
     updateMembersGrid(data.room.members);
@@ -196,6 +201,14 @@ function connectSocket() {
     showToast(`Welcome, ${userName}! 👋`);
   });
 
+  // Server indicates user needs to join (no session found)
+  socket.on("room:needsJoin", (data) => {
+    console.log("Server requests user to join:", data);
+    // Show join form if not already visible
+    if (joinRoomForm) joinRoomForm.style.display = "block";
+    if (planPokerContent) planPokerContent.style.display = "none";
+  });
+
   // New member joined
   socket.on("room:memberJoined", (data) => {
     console.log("Member joined:", data);
@@ -208,6 +221,20 @@ function connectSocket() {
     console.log("Member left:", data);
     updateMembersGrid(data.members);
     showToast(`${data.memberName} left the room 👋`);
+  });
+
+  // Member disconnected (temporary)
+  socket.on("room:memberDisconnected", (data) => {
+    console.log("Member disconnected:", data);
+    updateMembersGrid(data.members);
+    showToast(`${data.memberName} disconnected...`);
+  });
+
+  // Member reconnected
+  socket.on("room:memberReconnected", (data) => {
+    console.log("Member reconnected:", data);
+    updateMembersGrid(data.members);
+    showToast(`${data.memberName} is back online! 🔄`);
   });
 
   // Vote updated
