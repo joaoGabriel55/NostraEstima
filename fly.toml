@@ -20,3 +20,10 @@ primary_region = 'gru'
   memory = '256mb'
   cpus = 1
   memory_mb = 256
+
+[mounts]
+  source = "sqlite_data"
+  destination = "/data"
+
+[env]
+  DATABASE_PATH = "/data/app.db"

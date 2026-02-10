@@ -34,6 +34,9 @@ FROM base
 # Copy built application
 COPY --from=build /app /app
 
+# Create data directory for SQLite database
+RUN mkdir -p /data
+
 # Start the server by default, this can be overwritten at runtime
 EXPOSE 3000
 CMD [ "npm", "run", "start" ]
