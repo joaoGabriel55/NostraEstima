@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🃏 NostraEstima</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script
+      async
+      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9821555230393214"
+      crossorigin="anonymous"
+    ></script>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js" integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <!-- Background decorations -->
+    <div class="bg-decoration top-right">🃏</div>
+    <div class="bg-decoration bottom-left">♠️</div>
+
+    <!-- Page Layout Wrapper -->
+    <div class="page-wrapper">
+      <!-- Left Ad Sidebar -->
+      <aside class="ad-sidebar">
+        <div class="ad-placeholder">
+          <div class="ad-label">Advertisement</div>
+          <div class="ad-content">
+            <div class="ad-icon">📢</div>
+            <span>Google Ads</span>
+            <span class="ad-size">160 × 600</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+          <h1><img width="42" src="/public/flag.svg" alt="NostraEstima Logo" /> NostraEstima</h1>
+          <p>Estimate your tasks with fun!</p>
+        </header>
+
+        <% if (room && isNewUser) { %>
+          <!-- Join Room Form (for users joining via link) -->
+          <div id="join-room-form" class="container">
+            <div class="task-section">
+              <h2 class="section-title">Join Room</h2>
+              <p class="room-info-text">You're joining a room to estimate: <strong><%= room.taskTitle %></strong></p>
+              <div class="form-group">
+                <label class="form-label" for="playerName">Your Name</label>
+                <input
+                  type="text"
+                  id="joinPlayerName"
+                  class="form-input"
+                  placeholder="Enter your name"
+                  required
+                  autocomplete="off"
+                />
+              </div>
+              <button type="button" id="joinRoomBtn" class="submit-btn" data-room-id="<%= room.id %>">
+                Join Room
+              </button>
+            </div>
+          </div>
+        <% } %>
+
+        <% if (room) { %>
+          <!-- Plan Poker Room Content -->
+          <div id="plan-poker-content" class="container" style="<%= isNewUser ? 'display: none;' : '' %>">
+            <!-- Room Info Bar -->
+            <div class="room-info-bar">
+              <div class="room-link-section">
+                <span class="room-link-label">Share this link:</span>
+                <input type="text" id="roomLink" class="room-link-input" readonly value="" />
+                <button id="copyLinkBtn" class="copy-link-btn" title="Copy link">
+                  📋
+                </button>
+              </div>
+              <div class="room-timer" id="roomTimer">
+                <span class="timer-icon">⏱️</span>
+                <span id="timerDisplay">10:00</span>
+              </div>
+            </div>
+
+            <!-- Task Info Section -->
+            <section class="task-section">
+              <div class="form-group">
+                <label class="form-label" for="taskTitle">Task Title</label>
+                <input
+                  type="text"
+                  id="taskTitle"
+                  class="form-input"
+                  placeholder="e.g., Implement user authentication"
+                  readonly
+                  value="<%= room.taskTitle %>"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label" for="taskDescription">Description / Links</label>
+                <textarea
+                  id="taskDescription"
+                  class="form-input"
+                  readonly
+                  placeholder="Add any relevant links, Jira tickets, or additional context..."
+                ><%= room.taskDescription || '' %></textarea>
+              </div>
+            </section>
+
+            <!-- Members Section -->
+            <section class="members-section">
+              <h2 class="section-title">Team Members</h2>
+              <div class="members-grid" id="membersGrid">
+                <!-- Members will be populated by JavaScript -->
+              </div>
+            </section>
+
+            <!-- Cards Selection Section -->
+            <section class="cards-section" id="cardsSection">
+              <h2 class="section-title">Select Your Estimate <span>*</span></h2>
+
+              <div class="cards-grid" id="cardsGrid">
+                <!-- Cards will be generated by JavaScript -->
+              </div>
+
+              <div class="validation-error" id="validationError">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                <span>Please select a point estimate</span>
+              </div>
+            </section>
+
+            <!-- Selection Display -->
+            <div class="selection-display" id="selectionDisplay">
+              <p class="selection-placeholder">👆 Pick a card to estimate</p>
+            </div>
+
+            <!-- Results Section (shown after reveal) -->
+            <div class="results-section" id="resultsSection" style="display: none;">
+              <h2 class="section-title">🎉 Results</h2>
+              <div class="results-content">
+                <div class="average-display" id="averageDisplay">
+                  <span class="average-label">Average</span>
+                  <span class="average-value" id="averageValue">-</span>
+                </div>
+                <div class="votes-breakdown" id="votesBreakdown">
+                  <!-- Vote breakdown will be populated by JavaScript -->
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <section class="submit-section">
+              <button class="submit-btn" id="submitBtn">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M19.916 4.626a.75.75 0 01.208 1.04l-9 13.5a.75.75 0 01-1.154.114l-6-6a.75.75 0 011.06-1.06l5.353 5.353 8.493-12.739a.75.75 0 011.04-.208z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+                Submit Estimate
+              </button>
+
+              <!-- Admin Controls -->
+              <div class="admin-controls" id="adminControls" style="display: none;">
+                <button class="reveal-btn" id="revealBtn">
+                  👁️ Reveal Votes
+                </button>
+                <button class="reset-btn" id="resetBtn" style="display: none;">
+                  🔄 New Round
+                </button>
+                <button class="end-btn" id="endBtn">
+                  🛑 End Session
+                </button>
+              </div>
+            </section>
+          </div>
+
+          <!-- Hidden data for JavaScript -->
+          <script>
+            window.ROOM_DATA = {
+              id: "<%= room.id %>",
+              taskTitle: "<%= room.taskTitle %>",
+              taskDescription: "<%= (room.taskDescription || '').replace(/"/g, '&quot;').replace(/\n/g, '\\n') %>",
+              adminName: "<%= room.adminName %>"
+            };
+            window.IS_NEW_USER = <%= isNewUser %>;
+          </script>
+        <% } else { %>
+          <!-- Create New Room Form -->
+          <div id="plan-poker-player-register">
+            <div class="container">
+              <form id="player-register-form" method="post" action="/register">
+                <div class="form-group">
+                  <label class="form-label" for="playerName">Your Name</label>
+                  <input
+                    type="text"
+                    id="playerName"
+                    name="name"
+                    class="form-input"
+                    placeholder="Enter your name"
+                    required
+                    autocomplete="off"
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="taskTitle">Task Title</label>
+                  <input
+                    type="text"
+                    id="taskTitle"
+                    class="form-input"
+                    placeholder="e.g., Implement user authentication"
+                    autocomplete="off"
+                    name="taskTitle"
+                    required
+                  />
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="taskDescription">
+                    Description / Links
+                  </label>
+                  <textarea
+                    id="taskDescription"
+                    class="form-input"
+                    name="taskDescription"
+                    placeholder="Add any relevant links, Jira tickets, or additional context..."
+                  ></textarea>
+                </div>
+                <button type="submit" class="submit-btn">
+                  🚀 Start New Poker Room
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <script>
+            window.ROOM_DATA = null;
+            window.IS_NEW_USER = false;
+          </script>
+        <% } %>
+      </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span id="toastMessage">Estimate submitted!</span>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="toast error-toast" id="errorToast">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span id="errorToastMessage">An error occurred</span>
+    </div>
+
+    <script src="/public/script.js"></script>
+  </body>
+</html>
