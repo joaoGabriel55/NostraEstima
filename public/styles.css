@@ -317,6 +317,16 @@ textarea.form-input {
   background: rgba(34, 197, 94, 0.1);
 }
 
+.member-card.disconnected {
+  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.member-card.disconnected .member-avatar {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
+}
+
 .member-avatar {
   width: 48px;
   height: 48px;
@@ -367,6 +377,13 @@ textarea.form-input {
   font-size: 1.25rem;
   font-weight: 700;
   color: var(--card-selected);
+}
+
+.vote-offline {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-style: italic;
+  opacity: 0.7;
 }
 
 @keyframes pulse {

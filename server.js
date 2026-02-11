@@ -13,37 +13,64 @@ const __dirname = dirname(__filename);
 
 const app = express();
 const server = createServer(app);
-const io = new Server(server);
+
+// Socket.IO configuration optimized for production/Fly.io
+const io = new Server(server, {
+  // Connection settings for production reliability
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  // Upgrade timeout
+  upgradeTimeout: 30000,
+  // Allow reconnection
+  connectionStateRecovery: {
+    maxDisconnectionDuration: 2 * 60 * 1000, // 2 minutes
+    skipMiddlewares: false,
+  },
+  // Transport settings
+  transports: ["websocket", "polling"],
+  // CORS settings (adjust for production)
+  cors: {
+    origin: process.env.CORS_ORIGIN || true,
+    credentials: true,
+  },
+});
 
 const PORT = process.env.PORT || 4000;
 const MAX_ROOM_CAPACITY = 10;
 const ROOM_DURATION_MS = 10 * 60 * 1000; // 10 minutes
-
-// Helper functions for Valkey storage
-const ROOM_PREFIX = "planpoker:room:";
-
-async function getRoom(roomId) {
-  const data = await db.get(`${ROOM_PREFIX}${roomId}`);
-  if (!data) return null;
-  return JSON.parse(data);
-}
-
-async function setRoom(roomId, room) {
-  await db.set(`${ROOM_PREFIX}${roomId}`, JSON.stringify(room));
-}
-
-async function deleteRoom(roomId) {
-  await db.del(`${ROOM_PREFIX}${roomId}`);
-}
+const CLEANUP_INTERVAL_MS = 60 * 1000; // Run cleanup every minute
+const DISCONNECT_GRACE_PERIOD_MS = 30 * 1000; // 30 seconds grace period
 
 // Check if a room is expired
 function isRoomExpired(room) {
   return Date.now() - room.createdAt > ROOM_DURATION_MS;
 }
 
+// Periodic cleanup of expired rooms
+function startCleanupInterval() {
+  setInterval(() => {
+    try {
+      const expiredRoomIds = db.getExpiredRooms(ROOM_DURATION_MS);
+      
+      for (const roomId of expiredRoomIds) {
+        // Notify all users in the room
+        io.to(roomId).emit("room:expired", {
+          message: "Room has expired after 10 minutes.",
+        });
+        
+        // Delete the room
+        db.deleteRoom(roomId);
+        console.log(`[Cleanup] Room ${roomId} expired and deleted.`);
+      }
+    } catch (error) {
+      console.error("[Cleanup] Error during room cleanup:", error);
+    }
+  }, CLEANUP_INTERVAL_MS);
+}
+
 // Check room expiration and handle cleanup
-async function checkRoomExpiration(roomId, socket) {
-  const room = await getRoom(roomId);
+function checkRoomExpiration(roomId) {
+  const room = db.getRoom(roomId);
   if (!room) return true; // Room doesn't exist
 
   if (isRoomExpired(room)) {
@@ -51,7 +78,7 @@ async function checkRoomExpiration(roomId, socket) {
     io.to(roomId).emit("room:expired", {
       message: "Room has expired after 10 minutes.",
     });
-    await deleteRoom(roomId);
+    db.deleteRoom(roomId);
     console.log(`Room ${roomId} expired and deleted.`);
     return true;
   }
@@ -71,7 +98,6 @@ const sessionMiddleware = session({
 app.use(sessionMiddleware);
 
 // Share session with Socket.IO using express-socket.io-session
-// This properly handles session synchronization between HTTP and WebSocket
 io.use(sharedSession(sessionMiddleware, {
   autoSave: true,
 }));
@@ -87,7 +113,7 @@ app.set("views", join(__dirname, "views"));
 // Route: Join existing room
 app.get("/play/:id", async (req, res) => {
   const roomId = req.params.id;
-  const room = await getRoom(roomId);
+  const room = db.getRoom(roomId);
 
   if (!room) {
     res.redirect("/play");
@@ -96,7 +122,7 @@ app.get("/play/:id", async (req, res) => {
 
   // Check if room is expired
   if (isRoomExpired(room)) {
-    await deleteRoom(roomId);
+    db.deleteRoom(roomId);
     console.log(`Room ${roomId} expired and deleted on access.`);
     res.redirect("/play");
     return;
@@ -106,7 +132,6 @@ app.get("/play/:id", async (req, res) => {
 
   // Debug logging
   console.log(`[GET /play/${roomId}] Session ID: ${req.session.id}`);
-  console.log(`[GET /play/${roomId}] Session rooms:`, req.session.rooms);
   console.log(`[GET /play/${roomId}] User session for room:`, userSession);
 
   // Always render the room - the server will handle user state via session in WebSocket
@@ -119,14 +144,14 @@ app.get("/play/:id", async (req, res) => {
 app.post("/play/:id/join", async (req, res) => {
   const roomId = req.params.id;
   const { name } = req.body;
-  const room = await getRoom(roomId);
+  const room = db.getRoom(roomId);
 
   if (!room) {
     return res.status(404).json({ error: "Room not found" });
   }
 
   if (isRoomExpired(room)) {
-    await deleteRoom(roomId);
+    db.deleteRoom(roomId);
     return res.status(410).json({ error: "Room expired" });
   }
 
@@ -159,56 +184,64 @@ app.get("/play", (_, res) => {
 
 // Route: Register new room
 app.post("/register", async (req, res) => {
-  const roomId = randomUUID();
-  const adminToken = randomUUID(); // Token to identify the admin
+  const adminToken = randomUUID();
 
-  const room = {
-    id: roomId,
+  const room = db.createRoom({
     taskTitle: req.body.taskTitle,
     taskDescription: req.body.taskDescription,
     adminToken: adminToken,
     adminName: req.body.name,
-    members: [],
-    revealed: false,
-    createdAt: Date.now(),
-  };
-
-  await setRoom(roomId, room);
+  });
 
   if (!req.session.rooms) {
     req.session.rooms = {};
   }
 
-  req.session.rooms[roomId] = {
+  req.session.rooms[room.id] = {
     name: req.body.name,
     isAdmin: true,
     adminToken: adminToken,
     joinedAt: Date.now(),
   };
 
-  console.log("Created room:", roomId);
+  console.log("Created room:", room.id);
 
-  res.redirect(`/play/${roomId}`);
+  res.redirect(`/play/${room.id}`);
 });
 
-// WebSocket handling
-io.on("connection", (socket) => {
-  console.log("User connected:", socket.id);
+// ============== WebSocket Handling ==============
 
-  // Join room - now handles session checking server-side
+// Track pending disconnections for grace period handling
+const pendingDisconnections = new Map();
+
+io.on("connection", (socket) => {
+  console.log(`[Socket] User connected: ${socket.id}`);
+
+  // Handle connection state recovery
+  if (socket.recovered) {
+    console.log(`[Socket] Recovered connection for: ${socket.id}`);
+    // The socket automatically rejoins rooms it was in
+  }
+
+  // Join room - handles session checking server-side
   socket.on("room:join", async ({ roomId, name, adminToken }) => {
-    if (await checkRoomExpiration(roomId, socket)) {
+    if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
     }
 
-    const room = await getRoom(roomId);
+    const room = db.getRoom(roomId);
+    if (!room) {
+      socket.emit("room:error", { message: "Room not found." });
+      return;
+    }
+
     const socketSession = socket.handshake.session;
+    const sessionIdentifier = socketSession?.id;
 
     // Debug logging
     console.log(`[room:join] Socket ID: ${socket.id}`);
-    console.log(`[room:join] Session ID from socket: ${socketSession?.id}`);
-    console.log(`[room:join] Session rooms from socket:`, socketSession?.rooms);
+    console.log(`[room:join] Session ID: ${sessionIdentifier}`);
     console.log(`[room:join] Requested name: ${name}, adminToken: ${adminToken ? 'provided' : 'not provided'}`);
 
     // Get user session data for this room
@@ -234,12 +267,21 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Look for existing member by session identifier or name
-    const sessionIdentifier = socketSession?.id;
-    const existingMember = room.members.find(
-      (m) => m.sessionId === sessionIdentifier || m.name === userName,
-    );
+    // Cancel any pending disconnection for this session
+    const pendingKey = `${roomId}:${sessionIdentifier}`;
+    if (pendingDisconnections.has(pendingKey)) {
+      clearTimeout(pendingDisconnections.get(pendingKey));
+      pendingDisconnections.delete(pendingKey);
+      console.log(`[room:join] Cancelled pending disconnection for ${userName}`);
+    }
 
+    // Look for existing member by session identifier or name
+    let existingMember = db.getMemberBySession(roomId, sessionIdentifier);
+    if (!existingMember && userName) {
+      existingMember = db.getMemberByName(roomId, userName);
+    }
+
+    // Check room capacity for new members
     if (!existingMember && room.members.length >= MAX_ROOM_CAPACITY) {
       socket.emit("room:error", {
         message: "Room is full. Maximum 10 users allowed.",
@@ -250,26 +292,28 @@ io.on("connection", (socket) => {
     let member;
     let isReconnecting = false;
 
-    // Check if user already exists (reconnection)
     if (existingMember) {
-      // Reconnection - update socket ID
+      // Reconnection - update socket and session info
       isReconnecting = true;
-      existingMember.socketId = socket.id;
-      existingMember.sessionId = sessionIdentifier;
-      existingMember.connected = true;
-      member = existingMember;
+      db.updateMemberSocket(existingMember.id, socket.id, sessionIdentifier, true);
+      member = { ...existingMember, socketId: socket.id, sessionId: sessionIdentifier, connected: true };
+      console.log(`[room:join] User ${userName} reconnected to room ${roomId}`);
     } else {
       // New member
-      member = {
-        odentifier: randomUUID(),
+      member = db.addMember(roomId, {
         sessionId: sessionIdentifier,
         socketId: socket.id,
         name: userName,
         point: null,
         connected: true,
-        joinedAt: Date.now(),
-      };
-      room.members.push(member);
+      });
+
+      if (!member) {
+        socket.emit("room:error", {
+          message: "This name is already taken in the room.",
+        });
+        return;
+      }
 
       // Store in session if not already there
       if (socketSession && !userSession) {
@@ -282,66 +326,65 @@ io.on("connection", (socket) => {
           adminToken: userAdminToken === room.adminToken ? userAdminToken : null,
           joinedAt: Date.now(),
         };
-        await new Promise((resolve, reject) => {
-          socketSession.save((err) => {
-            if (err) {
-              console.error("Failed to save session:", err);
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
+        
+        socketSession.save((err) => {
+          if (err) {
+            console.error("[room:join] Failed to save session:", err);
+          }
         });
       }
     }
 
-    await setRoom(roomId, room);
-
+    // Join the Socket.IO room
     socket.join(roomId);
     socket.roomId = roomId;
     socket.userName = userName;
     socket.sessionId = sessionIdentifier;
+    socket.memberId = member.id;
 
     const isAdmin = userAdminToken === room.adminToken;
 
+    // Get fresh room data
+    const freshRoom = db.getRoom(roomId);
+
     // Send current game state
     socket.emit("room:joined", {
-      room: getSanitizedRoom(room),
+      room: getSanitizedRoom(freshRoom),
       isAdmin: isAdmin,
       userName: userName,
       isReconnecting: isReconnecting,
       isNewUser: isNewUser,
-      // Include current vote state if user had voted before
-      previousVote: room.revealed ? member.point : member.point !== null,
+      previousVote: freshRoom.revealed ? member.point : member.point !== null,
     });
 
-    // Only notify others if it's a new member (not reconnection)
+    // Notify others
     if (!isReconnecting) {
       socket.to(roomId).emit("room:memberJoined", {
         member: { name: userName, hasVoted: false },
-        members: getSanitizedMembers(room),
+        members: getSanitizedMembers(freshRoom),
       });
     } else {
-      // For reconnections, notify that user is back online
       socket.to(roomId).emit("room:memberReconnected", {
         memberName: userName,
-        members: getSanitizedMembers(room),
+        members: getSanitizedMembers(freshRoom),
       });
     }
 
-    console.log(
-      `${userName} joined room ${roomId}. Members: ${room.members.length}`,
-    );
+    console.log(`[room:join] ${userName} joined room ${roomId}. Members: ${freshRoom.members.length}`);
   });
 
   // Handle new user joining with name
   socket.on("room:joinWithName", async ({ roomId, name }) => {
-    if (await checkRoomExpiration(roomId, socket)) {
+    if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
     }
 
-    const room = await getRoom(roomId);
+    const room = db.getRoom(roomId);
+    if (!room) {
+      socket.emit("room:error", { message: "Room not found." });
+      return;
+    }
 
     if (!name || !name.trim()) {
       socket.emit("room:error", { message: "Please enter your name." });
@@ -351,7 +394,7 @@ io.on("connection", (socket) => {
     const trimmedName = name.trim();
 
     // Check if name is already taken in the room
-    const existingMember = room.members.find((m) => m.name === trimmedName);
+    const existingMember = db.getMemberByName(roomId, trimmedName);
     if (existingMember) {
       socket.emit("room:error", { message: "This name is already taken in the room." });
       return;
@@ -364,8 +407,10 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Store in session and wait for save to complete
     const socketSession = socket.handshake.session;
+    const sessionIdentifier = socketSession?.id;
+
+    // Store in session
     if (socketSession) {
       if (!socketSession.rooms) {
         socketSession.rooms = {};
@@ -375,49 +420,47 @@ io.on("connection", (socket) => {
         isAdmin: false,
         joinedAt: Date.now(),
       };
-      
+
       console.log(`[room:joinWithName] Saving session for ${trimmedName} in room ${roomId}`);
-      console.log(`[room:joinWithName] Session ID: ${socketSession.id}`);
-      console.log(`[room:joinWithName] Session rooms before save:`, socketSession.rooms);
-      
-      await new Promise((resolve, reject) => {
-        socketSession.save((err) => {
-          if (err) {
-            console.error("Failed to save session:", err);
-            reject(err);
-          } else {
-            console.log(`[room:joinWithName] Session saved successfully`);
-            resolve();
-          }
-        });
+
+      socketSession.save((err) => {
+        if (err) {
+          console.error("[room:joinWithName] Failed to save session:", err);
+        } else {
+          console.log(`[room:joinWithName] Session saved successfully`);
+        }
       });
-    } else {
-      console.error(`[room:joinWithName] No session available for socket`);
     }
 
-    // Now join the room with the name
-    const sessionIdentifier = session?.id;
-    const member = {
-      odentifier: randomUUID(),
+    // Add member to database
+    const member = db.addMember(roomId, {
       sessionId: sessionIdentifier,
       socketId: socket.id,
       name: trimmedName,
       point: null,
       connected: true,
-      joinedAt: Date.now(),
-    };
-    room.members.push(member);
+    });
 
-    await setRoom(roomId, room);
+    if (!member) {
+      socket.emit("room:error", {
+        message: "This name is already taken in the room.",
+      });
+      return;
+    }
 
+    // Join the Socket.IO room
     socket.join(roomId);
     socket.roomId = roomId;
     socket.userName = trimmedName;
     socket.sessionId = sessionIdentifier;
+    socket.memberId = member.id;
+
+    // Get fresh room data
+    const freshRoom = db.getRoom(roomId);
 
     // Send current game state
     socket.emit("room:joined", {
-      room: getSanitizedRoom(room),
+      room: getSanitizedRoom(freshRoom),
       isAdmin: false,
       userName: trimmedName,
       isReconnecting: false,
@@ -428,55 +471,54 @@ io.on("connection", (socket) => {
     // Notify others
     socket.to(roomId).emit("room:memberJoined", {
       member: { name: trimmedName, hasVoted: false },
-      members: getSanitizedMembers(room),
+      members: getSanitizedMembers(freshRoom),
     });
 
-    console.log(
-      `${trimmedName} joined room ${roomId}. Members: ${room.members.length}`,
-    );
+    console.log(`[room:joinWithName] ${trimmedName} joined room ${roomId}. Members: ${freshRoom.members.length}`);
   });
 
   // Submit vote
   socket.on("vote:submit", async ({ roomId, point }) => {
-    // Check if room exists and is not expired
-    if (await checkRoomExpiration(roomId, socket)) {
+    if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
     }
 
-    const room = await getRoom(roomId);
-
-    const memberIndex = room.members.findIndex((m) => m.socketId === socket.id);
-    if (memberIndex === -1) {
+    const member = db.getMemberBySocket(roomId, socket.id);
+    if (!member) {
       socket.emit("room:error", {
         message: "You are not a member of this room.",
       });
       return;
     }
 
-    room.members[memberIndex].point = point;
-    await setRoom(roomId, room);
+    // Update the vote
+    db.updateMemberPoint(member.id, point);
+
+    // Get fresh room data
+    const room = db.getRoom(roomId);
 
     // Notify all users about the vote (without revealing the value)
     io.to(roomId).emit("vote:updated", {
       members: getSanitizedMembers(room),
-      voterName: room.members[memberIndex].name,
+      voterName: member.name,
     });
 
-    console.log(
-      `${room.members[memberIndex].name} voted ${point} in room ${roomId}`,
-    );
+    console.log(`[vote:submit] ${member.name} voted ${point} in room ${roomId}`);
   });
 
   // Reveal votes (admin only)
   socket.on("votes:reveal", async ({ roomId, adminToken }) => {
-    // Check if room exists and is not expired
-    if (await checkRoomExpiration(roomId, socket)) {
+    if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
     }
 
-    const room = await getRoom(roomId);
+    const room = db.getRoom(roomId);
+    if (!room) {
+      socket.emit("room:error", { message: "Room not found." });
+      return;
+    }
 
     if (adminToken !== room.adminToken) {
       socket.emit("room:error", {
@@ -485,24 +527,25 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.revealed = true;
-    await setRoom(roomId, room);
+    // Update room state
+    db.setRoomRevealed(roomId, true);
+
+    // Get fresh room data
+    const freshRoom = db.getRoom(roomId);
 
     // Calculate average (only for numeric votes)
-    const numericVotes = room.members
+    const numericVotes = freshRoom.members
       .filter((m) => m.point !== null && typeof m.point === "number")
       .map((m) => m.point);
 
     const average =
       numericVotes.length > 0
-        ? (
-            numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length
-          ).toFixed(1)
+        ? (numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length).toFixed(1)
         : null;
 
     // Send revealed data to all users
     io.to(roomId).emit("votes:revealed", {
-      members: room.members.map((m) => ({
+      members: freshRoom.members.map((m) => ({
         name: m.name,
         point: m.point,
         hasVoted: m.point !== null,
@@ -510,18 +553,21 @@ io.on("connection", (socket) => {
       average: average,
     });
 
-    console.log(`Votes revealed in room ${roomId}. Average: ${average}`);
+    console.log(`[votes:reveal] Votes revealed in room ${roomId}. Average: ${average}`);
   });
 
   // Reset votes for new round (admin only)
   socket.on("votes:reset", async ({ roomId, adminToken }) => {
-    // Check if room exists and is not expired
-    if (await checkRoomExpiration(roomId, socket)) {
+    if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
     }
 
-    const room = await getRoom(roomId);
+    const room = db.getRoom(roomId);
+    if (!room) {
+      socket.emit("room:error", { message: "Room not found." });
+      return;
+    }
 
     if (adminToken !== room.adminToken) {
       socket.emit("room:error", { message: "Only the admin can reset votes." });
@@ -529,23 +575,23 @@ io.on("connection", (socket) => {
     }
 
     // Reset all votes
-    room.members.forEach((m) => {
-      m.point = null;
-    });
-    room.revealed = false;
-    await setRoom(roomId, room);
+    db.resetAllMemberPoints(roomId);
+    db.setRoomRevealed(roomId, false);
+
+    // Get fresh room data
+    const freshRoom = db.getRoom(roomId);
 
     // Notify all users
     io.to(roomId).emit("votes:reset", {
-      members: getSanitizedMembers(room),
+      members: getSanitizedMembers(freshRoom),
     });
 
-    console.log(`Votes reset in room ${roomId}`);
+    console.log(`[votes:reset] Votes reset in room ${roomId}`);
   });
 
   // End session (admin only)
   socket.on("room:end", async ({ roomId, adminToken }) => {
-    const room = await getRoom(roomId);
+    const room = db.getRoom(roomId);
 
     if (!room) {
       socket.emit("room:error", {
@@ -567,64 +613,67 @@ io.on("connection", (socket) => {
     });
 
     // Delete the room
-    await deleteRoom(roomId);
+    db.deleteRoom(roomId);
 
-    console.log(`Room ${roomId} ended by admin.`);
+    console.log(`[room:end] Room ${roomId} ended by admin.`);
   });
 
-  // Handle disconnect
-  socket.on("disconnect", async () => {
+  // Handle disconnect with grace period
+  socket.on("disconnect", async (reason) => {
     const roomId = socket.roomId;
     const userName = socket.userName;
     const sessionId = socket.sessionId;
+    const memberId = socket.memberId;
 
-    if (roomId) {
-      const room = await getRoom(roomId);
+    console.log(`[Socket] User disconnected: ${socket.id}, reason: ${reason}`);
 
+    if (roomId && memberId) {
+      // Mark member as disconnected immediately
+      db.updateMemberConnection(memberId, null, false);
+
+      // Notify others immediately
+      const room = db.getRoom(roomId);
       if (room) {
-        // Mark member as disconnected but don't remove them immediately
-        // This allows for reconnection
-        const member = room.members.find(
-          (m) => m.socketId === socket.id || m.sessionId === sessionId
-        );
+        io.to(roomId).emit("room:memberDisconnected", {
+          memberName: userName,
+          members: getSanitizedMembers(room),
+        });
 
-        if (member) {
-          member.connected = false;
-          member.socketId = null;
-          await setRoom(roomId, room);
+        console.log(`[disconnect] ${userName} disconnected from room ${roomId}`);
 
-          // Notify others
-          io.to(roomId).emit("room:memberDisconnected", {
-            memberName: userName,
-            members: getSanitizedMembers(room),
-          });
-
-          console.log(
-            `${userName} disconnected from room ${roomId}. Members: ${room.members.length}`,
-          );
-
-          // Check if all members are disconnected
-          const connectedMembers = room.members.filter((m) => m.connected);
-          if (connectedMembers.length === 0) {
-            // Set a timeout to delete the room if no one reconnects
-            setTimeout(async () => {
-              const currentRoom = await getRoom(roomId);
-              if (currentRoom) {
-                const stillConnected = currentRoom.members.filter((m) => m.connected);
-                if (stillConnected.length === 0) {
-                  await deleteRoom(roomId);
-                  console.log(`Room ${roomId} deleted (all members disconnected).`);
-                }
-              }
-            }, 30000); // 30 seconds grace period
+        // Set up grace period for room deletion if everyone is gone
+        const connectedCount = db.getConnectedMemberCount(roomId);
+        if (connectedCount === 0) {
+          const pendingKey = `room:${roomId}`;
+          
+          // Clear any existing timeout for this room
+          if (pendingDisconnections.has(pendingKey)) {
+            clearTimeout(pendingDisconnections.get(pendingKey));
           }
+
+          // Set a timeout to delete the room if no one reconnects
+          const timeoutId = setTimeout(() => {
+            const currentConnectedCount = db.getConnectedMemberCount(roomId);
+            if (currentConnectedCount === 0) {
+              db.deleteRoom(roomId);
+              console.log(`[disconnect] Room ${roomId} deleted (all members disconnected).`);
+            }
+            pendingDisconnections.delete(pendingKey);
+          }, DISCONNECT_GRACE_PERIOD_MS);
+
+          pendingDisconnections.set(pendingKey, timeoutId);
         }
       }
     }
+  });
 
-    console.log("User disconnected:", socket.id);
+  // Handle errors
+  socket.on("error", (error) => {
+    console.error(`[Socket] Error for socket ${socket.id}:`, error);
   });
 });
+
+// ============== Helper Functions ==============
 
 // Helper function to sanitize room data for clients
 function getSanitizedRoom(room) {
@@ -644,8 +693,12 @@ function getSanitizedMembers(room) {
     name: m.name,
     hasVoted: m.point !== null,
     point: room.revealed ? m.point : null,
+    connected: m.connected,
   }));
 }
+
+// Start the cleanup interval
+startCleanupInterval();
 
 // Start the server
 server.listen(PORT, () => {

@@ -378,14 +378,16 @@ function updateMembersGrid(members) {
   membersGrid.innerHTML = members
     .map(
       (member) => `
-      <div class="member-card ${member.hasVoted ? "voted" : ""}">
+      <div class="member-card ${member.hasVoted ? "voted" : ""} ${member.connected === false ? "disconnected" : ""}">
         <div class="member-avatar">
           ${member.name.charAt(0).toUpperCase()}
         </div>
         <div class="member-name">${member.name}</div>
         <div class="member-status">
           ${
-            member.point !== null
+            member.connected === false
+              ? '<span class="vote-offline">offline</span>'
+              : member.point !== null
               ? `<span class="vote-value">${member.point}</span>`
               : member.hasVoted
               ? '<span class="vote-hidden">✓</span>'
