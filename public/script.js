@@ -16,10 +16,8 @@ const cards = [
 let selectedCard = null;
 let socket = null;
 let isAdmin = false;
-let adminToken = null;
 let userName = null;
 let roomId = null;
-let roomCreatedAt = null;
 let timerInterval = null;
 
 // DOM Elements
@@ -39,57 +37,43 @@ const endBtn = document.getElementById("endBtn");
 const resultsSection = document.getElementById("resultsSection");
 const averageValue = document.getElementById("averageValue");
 const votesBreakdown = document.getElementById("votesBreakdown");
-const joinRoomForm = document.getElementById("join-room-form");
-const joinRoomBtn = document.getElementById("joinRoomBtn");
-const joinPlayerName = document.getElementById("joinPlayerName");
-const planPokerContent = document.getElementById("plan-poker-content");
 const roomLinkInput = document.getElementById("roomLink");
 const copyLinkBtn = document.getElementById("copyLinkBtn");
 const timerDisplay = document.getElementById("timerDisplay");
 const cardsSection = document.getElementById("cardsSection");
+const roomDataElement = document.getElementById("room-data");
 
 // Initialize
 document.addEventListener("DOMContentLoaded", () => {
-  if (window.ROOM_DATA) {
-    roomId = window.ROOM_DATA.id;
+  // Check if we're on the room page by looking for room-data element
+  if (roomDataElement) {
     initializeRoom();
   }
 });
 
+// Get room data from data attributes
+function getRoomData() {
+  if (!roomDataElement) return null;
+  
+  return {
+    roomId: roomDataElement.dataset.roomId,
+    taskTitle: roomDataElement.dataset.taskTitle,
+    taskDescription: roomDataElement.dataset.taskDescription,
+    adminName: roomDataElement.dataset.adminName,
+    userName: roomDataElement.dataset.userName,
+    isAdmin: roomDataElement.dataset.isAdmin === "true"
+  };
+}
+
 // Initialize room
 function initializeRoom() {
-  // Check if server provided session data (user already in session)
-  if (window.USER_SESSION) {
-    // User already has a session - use server-provided data
-    userName = window.USER_SESSION.userName;
-    adminToken = window.USER_SESSION.adminToken || null;
-    
-    // Store in sessionStorage for reconnection purposes
-    if (adminToken) {
-      sessionStorage.setItem(`adminToken_${roomId}`, adminToken);
-    }
-    sessionStorage.setItem(`userName_${roomId}`, userName);
+  const roomData = getRoomData();
+  if (!roomData) return;
 
-    // Clean up URL if there are query params
-    if (window.location.search) {
-      window.history.replaceState({}, document.title, `/play/${roomId}`);
-    }
-
-    // Show the poker content directly
-    if (joinRoomForm) joinRoomForm.style.display = "none";
-    if (planPokerContent) planPokerContent.style.display = "block";
-
-    // Connect to WebSocket
-    connectSocket();
-  } else {
-    // New user - show join form (server already rendered it visible)
-    setupJoinForm();
-  }
-
-  // Setup room link
-  if (roomLinkInput) {
-    roomLinkInput.value = window.location.origin + `/play/${roomId}`;
-  }
+  // Set state from data attributes
+  roomId = roomData.roomId;
+  userName = roomData.userName;
+  isAdmin = roomData.isAdmin;
 
   // Setup copy button
   if (copyLinkBtn) {
@@ -116,37 +100,9 @@ function initializeRoom() {
   if (endBtn) {
     endBtn.addEventListener("click", handleEndSession);
   }
-}
 
-// Setup join form for new users
-function setupJoinForm() {
-  // Connect to socket first (needed for new user flow)
+  // Connect to WebSocket
   connectSocket();
-
-  if (joinRoomBtn) {
-    joinRoomBtn.addEventListener("click", () => {
-      const name = joinPlayerName.value.trim();
-      if (!name) {
-        showErrorToast("Please enter your name");
-        return;
-      }
-
-      userName = name;
-
-      // Use server-side join with name (creates session on server)
-      socket.emit("room:joinWithName", {
-        roomId: roomId,
-        name: userName,
-      });
-    });
-
-    // Allow Enter key to submit
-    joinPlayerName.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
-        joinRoomBtn.click();
-      }
-    });
-  }
 }
 
 // Connect to WebSocket
@@ -156,15 +112,11 @@ function connectSocket() {
   socket.on("connect", () => {
     console.log("Connected to server");
 
-    // Only auto-join if user has session data (not new user)
-    if (window.USER_SESSION) {
-      socket.emit("room:join", {
-        roomId: roomId,
-        name: userName,
-        adminToken: adminToken,
-      });
-    }
-    // For new users, they will use room:joinWithName after entering their name
+    // Join the room via WebSocket (session already exists on server)
+    socket.emit("room:join", {
+      roomId: roomId,
+      name: userName
+    });
   });
 
   // Room joined successfully
@@ -172,15 +124,6 @@ function connectSocket() {
     console.log("Joined room:", data);
     isAdmin = data.isAdmin;
     userName = data.userName;
-    
-    // Store adminToken if provided (for admin users)
-    if (data.isAdmin && window.USER_SESSION?.adminToken) {
-      adminToken = window.USER_SESSION.adminToken;
-    }
-
-    // Update UI - show poker content, hide join form
-    if (joinRoomForm) joinRoomForm.style.display = "none";
-    if (planPokerContent) planPokerContent.style.display = "block";
 
     // Update UI with room data
     updateMembersGrid(data.room.members);
@@ -195,18 +138,10 @@ function connectSocket() {
       showResults(data.room.members, null);
     }
 
-    // Start timer (estimate based on room creation)
+    // Start timer
     startTimer();
 
     showToast(`Welcome, ${userName}! 👋`);
-  });
-
-  // Server indicates user needs to join (no session found)
-  socket.on("room:needsJoin", (data) => {
-    console.log("Server requests user to join:", data);
-    // Show join form if not already visible
-    if (joinRoomForm) joinRoomForm.style.display = "block";
-    if (planPokerContent) planPokerContent.style.display = "none";
   });
 
   // New member joined
@@ -512,41 +447,38 @@ function handleSubmit() {
 
 // Handle reveal (admin only)
 function handleReveal() {
-  if (!socket || !roomId || !adminToken) {
+  if (!socket || !roomId || !isAdmin) {
     showErrorToast("Not authorized");
     return;
   }
 
   socket.emit("votes:reveal", {
-    roomId: roomId,
-    adminToken: adminToken,
+    roomId: roomId
   });
 }
 
 // Handle reset (admin only)
 function handleReset() {
-  if (!socket || !roomId || !adminToken) {
+  if (!socket || !roomId || !isAdmin) {
     showErrorToast("Not authorized");
     return;
   }
 
   socket.emit("votes:reset", {
-    roomId: roomId,
-    adminToken: adminToken,
+    roomId: roomId
   });
 }
 
 // Handle end session (admin only)
 function handleEndSession() {
-  if (!socket || !roomId || !adminToken) {
+  if (!socket || !roomId || !isAdmin) {
     showErrorToast("Not authorized");
     return;
   }
 
   if (confirm("Are you sure you want to end this session?")) {
     socket.emit("room:end", {
-      roomId: roomId,
-      adminToken: adminToken,
+      roomId: roomId
     });
   }
 }

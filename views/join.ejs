@@ -1,0 +1,35 @@
+<!-- Join Room Form (for users joining via link) -->
+<div id="join-room-form" class="container">
+  <div class="task-section">
+    <h2 class="section-title">Join Room</h2>
+    <p class="room-info-text">You're joining a room to estimate: <strong><%= room.taskTitle %></strong></p>
+    <% if (room.taskDescription) { %>
+      <p class="room-info-text" style="font-size: 0.875rem; margin-top: -0.5rem;"><%= room.taskDescription %></p>
+    <% } %>
+    <% if (typeof error !== 'undefined' && error) { %>
+      <div class="validation-error show" style="margin-bottom: 1rem; justify-content: center;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px;">
+          <path fill-rule="evenodd" d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+        </svg>
+        <span><%= error %></span>
+      </div>
+    <% } %>
+    <form id="join-form" method="post" action="/play/<%= room.id %>/join">
+      <div class="form-group">
+        <label class="form-label" for="joinPlayerName">Your Name</label>
+        <input
+          type="text"
+          id="joinPlayerName"
+          name="name"
+          class="form-input"
+          placeholder="Enter your name"
+          required
+          autocomplete="off"
+        />
+      </div>
+      <button type="submit" class="submit-btn">
+        Join Room
+      </button>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>🃏 PokerEstima</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9821555230393214"
+         crossorigin="anonymous"></script>
+    <script src="https://cdn.socket.io/4.8.3/socket.io.min.js" integrity="sha384-kzavj5fiMwLKzzD1f8S7TeoVIEi7uKHvbTA3ueZkrzYq75pNQUiUi6Dy98Q3fxb0" crossorigin="anonymous"></script>
+    <link rel="stylesheet" href="/public/styles.css" />
+  </head>
+  <body>
+    <!-- Background decorations -->
+    <div class="bg-decoration top-right">🃏</div>
+    <div class="bg-decoration bottom-left">♠️</div>
+
+    <!-- Page Layout Wrapper -->
+    <div class="page-wrapper">
+      <!-- Left Ad Sidebar -->
+      <aside class="ad-sidebar">
+        <div class="ad-placeholder">
+          <div class="ad-label">Advertisement</div>
+          <div class="ad-content">
+            <ins
+              class="adsbygoogle adslot_1"
+              style="display: inline-block"
+              data-ad-client="ca-pub-9821555230393214"
+              data-ad-slot="9561031910"
+            ></ins>
+            <script>
+              (adsbygoogle = window.adsbygoogle || []).push({});
+            </script>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Main Content -->
+      <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+          <h1><img width="42" src="/public/flag.svg" alt="PokerEstima Logo" /> PokerEstima</h1>
+          <p>Estimate your tasks with fun!</p>
+        </header>
+
+        <%- body %>
+      </main>
+    </div>
+
+    <!-- Toast Notification -->
+    <div class="toast" id="toast">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm13.36-1.814a.75.75 0 10-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 00-1.06 1.06l2.25 2.25a.75.75 0 001.14-.094l3.75-5.25z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span id="toastMessage">Estimate submitted!</span>
+    </div>
+
+    <!-- Error Toast -->
+    <div class="toast error-toast" id="errorToast">
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        <path
+          fill-rule="evenodd"
+          d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z"
+          clip-rule="evenodd"
+        />
+      </svg>
+      <span id="errorToastMessage">An error occurred</span>
+    </div>
+
+    <script src="/public/script.js"></script>
+  </body>
+</html>

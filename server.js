@@ -7,11 +7,14 @@ import { Server } from "socket.io";
 import { fileURLToPath } from "url";
 import { db } from "./db/index.js";
 import sharedSession from "express-socket.io-session";
+import ejsLayouts from "express-ejs-layouts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
+// Trust proxy for production environments (Fly.io, Heroku, etc.)
+app.set('trust proxy', 1);
 const server = createServer(app);
 
 // Socket.IO configuration optimized for production/Fly.io
@@ -51,13 +54,13 @@ function startCleanupInterval() {
   setInterval(() => {
     try {
       const expiredRoomIds = db.getExpiredRooms(ROOM_DURATION_MS);
-      
+
       for (const roomId of expiredRoomIds) {
         // Notify all users in the room
         io.to(roomId).emit("room:expired", {
           message: "Room has expired after 10 minutes.",
         });
-        
+
         // Delete the room
         db.deleteRoom(roomId);
         console.log(`[Cleanup] Room ${roomId} expired and deleted.`);
@@ -91,6 +94,7 @@ const sessionMiddleware = session({
   saveUninitialized: true,
   cookie: {
     secure: Boolean(process.env.SECRET_KEY), // Set to true in production with HTTPS
+    sameSite: 'lax', // Required for cookies to work properly in modern browsers
     maxAge: 10 * 60 * 1000, // 10 minutes
   },
 });
@@ -109,8 +113,20 @@ app.use(urlencoded({ extended: true }));
 app.use(serveStatic(join(__dirname)));
 app.set("view engine", "ejs");
 app.set("views", join(__dirname, "views"));
+app.use(ejsLayouts);
+app.set("layout", "layout");
 
-// Route: Join existing room
+// Route: Home redirects to /play
+app.get("/", (req, res) => {
+  res.redirect("/play");
+});
+
+// Route: Create new room form
+app.get("/play", (_, res) => {
+  res.render("new", { layout: "layout" });
+});
+
+// Route: View existing room
 app.get("/play/:id", async (req, res) => {
   const roomId = req.params.id;
   const room = db.getRoom(roomId);
@@ -134,32 +150,94 @@ app.get("/play/:id", async (req, res) => {
   console.log(`[GET /play/${roomId}] Session ID: ${req.session.id}`);
   console.log(`[GET /play/${roomId}] User session for room:`, userSession);
 
-  // Always render the room - the server will handle user state via session in WebSocket
-  res.render("index", {
+  // If user has no session for this room, show join page
+  if (!userSession) {
+    res.render("join", { 
+      layout: "layout",
+      room 
+    });
+    return;
+  }
+
+  // User has a session - show the room
+  const roomUrl = `${req.protocol}://${req.get('host')}/play/${roomId}`;
+  res.render("room", { 
+    layout: "layout",
     room,
-    userSession: userSession || null,
+    userSession,
+    roomUrl
   });
 });
 
+// Route: Join room (POST)
 app.post("/play/:id/join", async (req, res) => {
   const roomId = req.params.id;
-  const { name } = req.body;
   const room = db.getRoom(roomId);
 
   if (!room) {
-    return res.status(404).json({ error: "Room not found" });
+    res.redirect("/play");
+    return;
   }
 
+  // Check if room is expired
   if (isRoomExpired(room)) {
     db.deleteRoom(roomId);
-    return res.status(410).json({ error: "Room expired" });
+    console.log(`Room ${roomId} expired and deleted on access.`);
+    res.redirect("/play");
+    return;
   }
 
+  const name = req.body.name?.trim();
+
+  if (!name) {
+    res.render("join", { 
+      layout: "layout",
+      room,
+      error: "Please enter your name."
+    });
+    return;
+  }
+
+  // Check if name is already taken in the room
+  const existingMember = db.getMemberByName(roomId, name);
+  if (existingMember) {
+    res.render("join", { 
+      layout: "layout",
+      room,
+      error: "This name is already taken in the room."
+    });
+    return;
+  }
+
+  // Check room capacity
   if (room.members.length >= MAX_ROOM_CAPACITY) {
-    return res.status(403).json({ error: "Room is full" });
+    res.render("join", { 
+      layout: "layout",
+      room,
+      error: "Room is full. Maximum 10 users allowed."
+    });
+    return;
   }
 
-  // Store in session
+  // Add member to database so they're reserved
+  const member = db.addMember(roomId, {
+    sessionId: req.session.id,
+    socketId: null, // Will be set when WebSocket connects
+    name: name,
+    point: null,
+    connected: false, // Not connected via WebSocket yet
+  });
+
+  if (!member) {
+    res.render("join", { 
+      layout: "layout",
+      room,
+      error: "This name is already taken in the room."
+    });
+    return;
+  }
+
+  // Create session for this room
   if (!req.session.rooms) {
     req.session.rooms = {};
   }
@@ -167,19 +245,20 @@ app.post("/play/:id/join", async (req, res) => {
   req.session.rooms[roomId] = {
     name: name,
     isAdmin: false,
+    adminToken: null,
     joinedAt: Date.now(),
   };
 
-  res.json({ success: true, userName: name });
-});
+  console.log(`[POST /play/${roomId}/join] User ${name} joining room`);
 
-app.get("/", (req, res) => {
-  res.redirect("/play");
-});
-
-// Route: Create new room form
-app.get("/play", (_, res) => {
-  res.render("index", { room: null, userSession: null });
+  // Save session and redirect to room
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.redirect("/play");
+    }
+    res.redirect(`/play/${roomId}`);
+  });
 });
 
 // Route: Register new room
@@ -206,7 +285,14 @@ app.post("/register", async (req, res) => {
 
   console.log("Created room:", room.id);
 
-  res.redirect(`/play/${room.id}`);
+  // Explicitly save session before redirect to ensure it persists
+  req.session.save((err) => {
+    if (err) {
+      console.error('Session save error:', err);
+      return res.redirect("/play");
+    }
+    res.redirect(`/play/${room.id}`);
+  });
 });
 
 // ============== WebSocket Handling ==============
@@ -258,7 +344,8 @@ io.on("connection", (socket) => {
       userAdminToken = userSession.adminToken || null;
       isNewUser = false;
     } else if (!name) {
-      // No session and no name provided - user needs to join first
+      // No session and no name provided - this is a fallback for edge cases
+      // Normal flow handles this via HTTP redirect to join page
       socket.emit("room:needsJoin", {
         roomId: roomId,
         taskTitle: room.taskTitle,
@@ -291,13 +378,17 @@ io.on("connection", (socket) => {
 
     let member;
     let isReconnecting = false;
+    let isFirstConnection = false;
 
     if (existingMember) {
-      // Reconnection - update socket and session info
-      isReconnecting = true;
+      // Check if this is a reconnection (was previously connected) or first WebSocket connection
+      // Members created via HTTP POST have connected: false until WebSocket connects
+      isReconnecting = existingMember.connected === true || existingMember.socketId !== null;
+      isFirstConnection = !isReconnecting;
+      
       db.updateMemberSocket(existingMember.id, socket.id, sessionIdentifier, true);
       member = { ...existingMember, socketId: socket.id, sessionId: sessionIdentifier, connected: true };
-      console.log(`[room:join] User ${userName} reconnected to room ${roomId}`);
+      console.log(`[room:join] User ${userName} ${isReconnecting ? 'reconnected to' : 'connected to'} room ${roomId}`);
     } else {
       // New member
       member = db.addMember(roomId, {
@@ -326,7 +417,7 @@ io.on("connection", (socket) => {
           adminToken: userAdminToken === room.adminToken ? userAdminToken : null,
           joinedAt: Date.now(),
         };
-        
+
         socketSession.save((err) => {
           if (err) {
             console.error("[room:join] Failed to save session:", err);
@@ -358,12 +449,14 @@ io.on("connection", (socket) => {
     });
 
     // Notify others
-    if (!isReconnecting) {
+    if (!isReconnecting || isFirstConnection) {
+      // New member or first WebSocket connection after HTTP join
       socket.to(roomId).emit("room:memberJoined", {
         member: { name: userName, hasVoted: false },
         members: getSanitizedMembers(freshRoom),
       });
     } else {
+      // Actual reconnection (was connected before, disconnected, now back)
       socket.to(roomId).emit("room:memberReconnected", {
         memberName: userName,
         members: getSanitizedMembers(freshRoom),
@@ -371,110 +464,6 @@ io.on("connection", (socket) => {
     }
 
     console.log(`[room:join] ${userName} joined room ${roomId}. Members: ${freshRoom.members.length}`);
-  });
-
-  // Handle new user joining with name
-  socket.on("room:joinWithName", async ({ roomId, name }) => {
-    if (checkRoomExpiration(roomId)) {
-      socket.emit("room:error", { message: "Room not found or has expired." });
-      return;
-    }
-
-    const room = db.getRoom(roomId);
-    if (!room) {
-      socket.emit("room:error", { message: "Room not found." });
-      return;
-    }
-
-    if (!name || !name.trim()) {
-      socket.emit("room:error", { message: "Please enter your name." });
-      return;
-    }
-
-    const trimmedName = name.trim();
-
-    // Check if name is already taken in the room
-    const existingMember = db.getMemberByName(roomId, trimmedName);
-    if (existingMember) {
-      socket.emit("room:error", { message: "This name is already taken in the room." });
-      return;
-    }
-
-    if (room.members.length >= MAX_ROOM_CAPACITY) {
-      socket.emit("room:error", {
-        message: "Room is full. Maximum 10 users allowed.",
-      });
-      return;
-    }
-
-    const socketSession = socket.handshake.session;
-    const sessionIdentifier = socketSession?.id;
-
-    // Store in session
-    if (socketSession) {
-      if (!socketSession.rooms) {
-        socketSession.rooms = {};
-      }
-      socketSession.rooms[roomId] = {
-        name: trimmedName,
-        isAdmin: false,
-        joinedAt: Date.now(),
-      };
-
-      console.log(`[room:joinWithName] Saving session for ${trimmedName} in room ${roomId}`);
-
-      socketSession.save((err) => {
-        if (err) {
-          console.error("[room:joinWithName] Failed to save session:", err);
-        } else {
-          console.log(`[room:joinWithName] Session saved successfully`);
-        }
-      });
-    }
-
-    // Add member to database
-    const member = db.addMember(roomId, {
-      sessionId: sessionIdentifier,
-      socketId: socket.id,
-      name: trimmedName,
-      point: null,
-      connected: true,
-    });
-
-    if (!member) {
-      socket.emit("room:error", {
-        message: "This name is already taken in the room.",
-      });
-      return;
-    }
-
-    // Join the Socket.IO room
-    socket.join(roomId);
-    socket.roomId = roomId;
-    socket.userName = trimmedName;
-    socket.sessionId = sessionIdentifier;
-    socket.memberId = member.id;
-
-    // Get fresh room data
-    const freshRoom = db.getRoom(roomId);
-
-    // Send current game state
-    socket.emit("room:joined", {
-      room: getSanitizedRoom(freshRoom),
-      isAdmin: false,
-      userName: trimmedName,
-      isReconnecting: false,
-      isNewUser: false,
-      previousVote: null,
-    });
-
-    // Notify others
-    socket.to(roomId).emit("room:memberJoined", {
-      member: { name: trimmedName, hasVoted: false },
-      members: getSanitizedMembers(freshRoom),
-    });
-
-    console.log(`[room:joinWithName] ${trimmedName} joined room ${roomId}. Members: ${freshRoom.members.length}`);
   });
 
   // Submit vote
@@ -508,7 +497,7 @@ io.on("connection", (socket) => {
   });
 
   // Reveal votes (admin only)
-  socket.on("votes:reveal", async ({ roomId, adminToken }) => {
+  socket.on("votes:reveal", async ({ roomId }) => {
     if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
@@ -520,7 +509,11 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (adminToken !== room.adminToken) {
+    // Verify admin status from session
+    const socketSession = socket.handshake.session;
+    const userSession = socketSession?.rooms?.[roomId];
+    
+    if (!userSession?.isAdmin || userSession?.adminToken !== room.adminToken) {
       socket.emit("room:error", {
         message: "Only the admin can reveal votes.",
       });
@@ -557,7 +550,7 @@ io.on("connection", (socket) => {
   });
 
   // Reset votes for new round (admin only)
-  socket.on("votes:reset", async ({ roomId, adminToken }) => {
+  socket.on("votes:reset", async ({ roomId }) => {
     if (checkRoomExpiration(roomId)) {
       socket.emit("room:error", { message: "Room not found or has expired." });
       return;
@@ -569,7 +562,11 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (adminToken !== room.adminToken) {
+    // Verify admin status from session
+    const socketSession = socket.handshake.session;
+    const userSession = socketSession?.rooms?.[roomId];
+    
+    if (!userSession?.isAdmin || userSession?.adminToken !== room.adminToken) {
       socket.emit("room:error", { message: "Only the admin can reset votes." });
       return;
     }
@@ -590,7 +587,7 @@ io.on("connection", (socket) => {
   });
 
   // End session (admin only)
-  socket.on("room:end", async ({ roomId, adminToken }) => {
+  socket.on("room:end", async ({ roomId }) => {
     const room = db.getRoom(roomId);
 
     if (!room) {
@@ -600,7 +597,11 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (adminToken !== room.adminToken) {
+    // Verify admin status from session
+    const socketSession = socket.handshake.session;
+    const userSession = socketSession?.rooms?.[roomId];
+    
+    if (!userSession?.isAdmin || userSession?.adminToken !== room.adminToken) {
       socket.emit("room:error", {
         message: "Only the admin can end the session.",
       });
@@ -645,7 +646,7 @@ io.on("connection", (socket) => {
         const connectedCount = db.getConnectedMemberCount(roomId);
         if (connectedCount === 0) {
           const pendingKey = `room:${roomId}`;
-          
+
           // Clear any existing timeout for this room
           if (pendingDisconnections.has(pendingKey)) {
             clearTimeout(pendingDisconnections.get(pendingKey));
