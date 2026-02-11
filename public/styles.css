@@ -387,7 +387,8 @@ textarea.form-input {
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.3;
   }
   50% {
@@ -422,14 +423,12 @@ textarea.form-input {
 
 @media (max-width: 768px) {
   .cards-grid {
-    grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .cards-grid {
-    grid-template-columns: repeat(2, 1fr);
+    display: grid;
+    grid-gap: 8px;
+    grid-template-rows: 150px;
+    grid-auto-flow: column;
+    overflow-x: scroll;
+    padding: 18px 0;
   }
 }
 

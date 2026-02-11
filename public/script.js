@@ -54,14 +54,14 @@ document.addEventListener("DOMContentLoaded", () => {
 // Get room data from data attributes
 function getRoomData() {
   if (!roomDataElement) return null;
-  
+
   return {
     roomId: roomDataElement.dataset.roomId,
     taskTitle: roomDataElement.dataset.taskTitle,
     taskDescription: roomDataElement.dataset.taskDescription,
     adminName: roomDataElement.dataset.adminName,
     userName: roomDataElement.dataset.userName,
-    isAdmin: roomDataElement.dataset.isAdmin === "true"
+    isAdmin: roomDataElement.dataset.isAdmin === "true",
   };
 }
 
@@ -115,7 +115,7 @@ function connectSocket() {
     // Join the room via WebSocket (session already exists on server)
     socket.emit("room:join", {
       roomId: roomId,
-      name: userName
+      name: userName,
     });
   });
 
@@ -235,13 +235,11 @@ function renderCards() {
         <div class="poker-card" data-index="${index}" data-value="${card.value}">
           <div class="card-inner">
             <div class="card-corner top-left">
-              <span>${card.value}</span>
               <span class="card-corner-emoji">${card.emoji}</span>
             </div>
             <span class="card-number">${card.value}</span>
             <span class="card-emoji">${card.emoji}</span>
             <div class="card-corner bottom-right">
-              <span>${card.value}</span>
               <span class="card-corner-emoji">${card.emoji}</span>
             </div>
             <div class="selected-indicator">
@@ -251,7 +249,7 @@ function renderCards() {
             </div>
           </div>
         </div>
-    `
+    `,
     )
     .join("");
 
@@ -323,14 +321,14 @@ function updateMembersGrid(members) {
             member.connected === false
               ? '<span class="vote-offline">offline</span>'
               : member.point !== null
-              ? `<span class="vote-value">${member.point}</span>`
-              : member.hasVoted
-              ? '<span class="vote-hidden">✓</span>'
-              : '<span class="vote-pending">...</span>'
+                ? `<span class="vote-value">${member.point}</span>`
+                : member.hasVoted
+                  ? '<span class="vote-hidden">✓</span>'
+                  : '<span class="vote-pending">...</span>'
           }
         </div>
       </div>
-    `
+    `,
     )
     .join("");
 }
@@ -355,7 +353,7 @@ function showResults(members, average) {
 
   // Display vote breakdown
   const sortedVotes = Object.entries(voteDistribution).sort(
-    (a, b) => parseInt(a[0]) - parseInt(b[0])
+    (a, b) => parseInt(a[0]) - parseInt(b[0]),
   );
   votesBreakdown.innerHTML = sortedVotes
     .map(([value, count]) => {
@@ -442,7 +440,9 @@ function handleSubmit() {
     point: selectedCard.value,
   });
 
-  showToast(`Vote submitted: ${selectedCard.emoji} ${selectedCard.value} points`);
+  showToast(
+    `Vote submitted: ${selectedCard.emoji} ${selectedCard.value} points`,
+  );
 }
 
 // Handle reveal (admin only)
@@ -453,7 +453,7 @@ function handleReveal() {
   }
 
   socket.emit("votes:reveal", {
-    roomId: roomId
+    roomId: roomId,
   });
 }
 
@@ -465,7 +465,7 @@ function handleReset() {
   }
 
   socket.emit("votes:reset", {
-    roomId: roomId
+    roomId: roomId,
   });
 }
 
@@ -478,7 +478,7 @@ function handleEndSession() {
 
   if (confirm("Are you sure you want to end this session?")) {
     socket.emit("room:end", {
-      roomId: roomId
+      roomId: roomId,
     });
   }
 }
