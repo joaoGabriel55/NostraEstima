@@ -1,13 +1,13 @@
-# 🃏 PokerEstima App
+# 🃏 NostraEstima
 
-<img width="1593" height="709" alt="image" src="https://github.com/user-attachments/assets/7c7decfa-3720-4672-83ec-c85b2f556a3a" />
+<img width="1440" alt="NostraEstima room after the reveal: player plaques with their votes, the average 7.2 and the split" src="docs/screenshots/room-desktop.png" />
 
-<img width="1167" height="1257" alt="image" src="https://github.com/user-attachments/assets/486cb79c-c0f7-4741-ab72-0450770eadeb" />
+<img width="390" alt="The same room on a phone, beside a video call" src="docs/screenshots/room-mobile.png" />
 
-> Estimate your tasks with fun! A real-time planning poker application for agile teams.
+> Estimate your tasks with fun! A real-time planning poker application for agile teams. One link, no sign-up, and the room closes itself when you're done.
 
-![Planning Poker](https://img.shields.io/badge/Planning-Poker-6366f1?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=)
-![Node.js](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
+![Planning Poker](https://img.shields.io/badge/Planning-Poker-B4512F?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI+PHBhdGggZmlsbD0id2hpdGUiIGQ9Ik0xMiAyQzYuNDggMiAyIDYuNDggMiAxMnM0LjQ4IDEwIDEwIDEwIDEwLTQuNDggMTAtMTBTMTcuNTIgMiAxMiAyem0wIDE4Yy00LjQxIDAtOC0zLjU5LTgtOHMzLjU5LTggOC04IDggMy41OSA4IDgtMy41OSA4LTggOHoiLz48L3N2Zz4=)
+![Node.js](https://img.shields.io/badge/Node.js-22.5+-339933?style=for-the-badge&logo=nodedotjs&logoColor=white)
 ![Socket.io](https://img.shields.io/badge/Socket.io-4.x-010101?style=for-the-badge&logo=socketdotio&logoColor=white)
 ![Express](https://img.shields.io/badge/Express-5.x-000000?style=for-the-badge&logo=express&logoColor=white)
 
@@ -15,14 +15,16 @@
 
 ## ✨ Features
 
-- 🎴 **Beautiful Card UI** - Intuitive poker cards with emoji indicators for each estimate
-- ⚡ **Real-time Updates** - Powered by WebSockets for instant synchronization
-- 👥 **Team Collaboration** - Support for up to 10 participants per room
-- 🔒 **Hidden Votes** - Votes stay hidden until the admin reveals them (no anchoring bias!)
-- 📊 **Instant Results** - Automatic average calculation and vote distribution
-- 🔄 **Multiple Rounds** - Reset and start new estimations without leaving the room
-- 📋 **Shareable Links** - One-click copy to invite team members
-- ⏱️ **Auto Cleanup** - Rooms expire after 10 minutes to keep things tidy
+- 🎴 **One tap to vote** - Tap a card and your vote is sent; tap another to change it before the reveal
+- ⚡ **Real-time updates** - Powered by WebSockets for instant synchronization
+- 👥 **Team collaboration** - Up to 10 participants per room
+- 🔒 **Hidden votes** - Votes stay hidden until the facilitator reveals them (no anchoring bias!)
+- 📊 **Instant results** - Average, nearest card and the vote split, one block per vote
+- 🔄 **Multiple rounds** - Start a new round without leaving the room
+- 📋 **Shareable links** - One-click copy to invite the team
+- ⏱️ **Ephemeral rooms** - Rooms close after 10 minutes; the facilitator can add 5 minutes once
+- ⌨️ **Keyboard shortcuts** - Type a card's number to vote; the facilitator reveals with <kbd>Shift</kbd>+<kbd>R</kbd>
+- 📱 **Built for the side of a call** - Works in a narrow window next to your video meeting
 
 ---
 
@@ -30,15 +32,15 @@
 
 ### Prerequisites
 
-- Node.js 18 or higher
-- npm or yarn
+- Node.js 22.5 or higher (the app uses the built-in `node:sqlite` module)
+- npm
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/point-point-app.git
-cd point-point-app
+git clone https://github.com/joaoGabriel55/NostraEstima.git
+cd NostraEstima
 
 # Install dependencies
 npm install
@@ -60,33 +62,32 @@ The app will be running at **http://localhost:4000** 🎉
 
 ## 🎮 How to Play
 
-### 1. Create a Room 🏠
+### 1. Open a Room 🏠
 
 1. Go to `/play` or `/`
-2. Enter your name and the task details
-3. Click **"Start New Poker Room"**
+2. Enter your name and the task (title, plus any links or context)
+3. Click **"Start the room"**. You're the facilitator.
 
 ### 2. Invite Your Team 📨
 
-1. Copy the room link (click the 📋 button)
-2. Share it with your teammates
-3. They enter their names and join instantly!
+1. Click **"Copy link"** and paste it in the call chat
+2. Teammates enter their name and take a seat. No account needed.
 
-### 3. Cast Your Votes 🗳️
+### 3. Vote 🗳️
 
-1. Each participant selects a card (0, 1, 2, 3, 5, 8, 13, 20, 40, or 100)
-2. Votes remain hidden until revealed
-3. A checkmark ✓ shows who has voted
+1. Tap a card (0, 1, 2, 3, 5, 8, 13, 20, 40, or 100), or type its number
+2. Your vote is sent right away; tap another card to change it
+3. Plaques show who has voted (yellow) and who is still choosing (dashed), never the value
 
 ### 4. Reveal & Discuss 🎉
 
-1. The admin clicks **"👁️ Reveal Votes"**
-2. All votes are shown along with the average
-3. Discuss any outliers and reach consensus
+1. The facilitator clicks **"Reveal votes"** (it shows how many have voted, e.g. 4/5)
+2. Every vote appears, with the average, the nearest card and the split
+3. Discuss the outliers and agree on an estimate
 
 ### 5. New Round 🔄
 
-1. Click **"🔄 New Round"** to reset all votes
+1. The facilitator clicks **"New round"** to clear the votes
 2. Estimate the next task!
 
 ---
@@ -104,55 +105,80 @@ The app will be running at **http://localhost:4000** 🎉
 | 13 | 🧙 | Extra large |
 | 20 | 🐙 | Huge task |
 | 40 | 👹 | Massive effort |
-| 100 | ⚡💀 | Epic! (Maybe split it?) |
+| 100 | 💀 | Epic! (Maybe split it?) |
+
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Keys | Who | Action |
+|------|-----|--------|
+| A card's number (e.g. `8`, `1` `3`) | Everyone | Vote for that card |
+| <kbd>Shift</kbd>+<kbd>R</kbd> | Facilitator | Reveal votes |
+| <kbd>Shift</kbd>+<kbd>N</kbd> | Facilitator | Start a new round |
+
+Shortcuts are ignored while you're typing in a field.
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Backend**: Express.js 5.x
+- **Backend**: Express.js 5.x, server-rendered EJS
 - **Real-time**: Socket.io 4.x
-- **Templating**: EJS
-- **Frontend**: Vanilla JavaScript
-- **Storage**: In-memory (server-side)
+- **Frontend**: Vanilla JavaScript, no bundler
+- **Storage**: SQLite (`node:sqlite`), persisted on a Fly.io volume in production
 
 ---
 
 ## 📁 Project Structure
 
 ```
-point-point-app/
-├── server.js           # Express + Socket.io server
-├── views/
-│   └── index.ejs       # Main template
+NostraEstima/
+├── server.js                  # Express + Socket.io server, room cleanup
+├── db/index.js                # SQLite connection and schema
+├── src/
+│   ├── constants.js           # Capacity, room lifetime, deck values
+│   ├── helpers.js             # Room expiry, average, safe link formatting
+│   ├── controllers/           # HTTP routes and socket events
+│   ├── repositories/          # Rooms and members
+│   └── views/                 # EJS layout and pages
 ├── public/
-│   ├── script.js       # Client-side logic
-│   └── styles.css      # Beautiful styles
-├── package.json
-└── README.md
+│   ├── script.js              # Client-side logic
+│   ├── styles.css             # The NostraEstima visual system
+│   └── fonts/                 # Self-hosted Marcellus and Archivo
+├── DESIGN.md                  # Design system
+├── PRODUCT.md                 # Product context
+└── package.json
 ```
 
 ---
 
 ## 🔧 Configuration
 
+Environment variables:
+
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | 4000 | Server port |
-| `MAX_ROOM_CAPACITY` | 10 | Maximum users per room |
-| `ROOM_DURATION_MS` | 600000 | Room lifetime (10 minutes) |
+| `DATABASE_PATH` | `./data/app.db` | SQLite database file |
+| `SECRET_KEY` | (dev default) | Session secret; also turns on secure cookies |
+| `CORS_ORIGIN` | any origin | Allowed origin for Socket.IO connections; set it in production |
+
+Room rules live in `src/constants.js`: capacity (10), lifetime (10 minutes), the one-time extension (5 minutes) and the disconnect grace period (30 seconds).
 
 ---
 
 ## 🎯 Room Rules
 
-- **Max 10 users** per room
-- **10-minute lifetime** - rooms auto-expire
-- **Admin powers** - only the room creator can:
+- **Max 10 people** per room
+- **10-minute lifetime** - rooms close by themselves
+- **One extension** - in the last 2 minutes the facilitator can add 5 minutes, once
+- **Facilitator powers** - only the room creator can:
   - Reveal votes
   - Start new rounds
+  - Add time
   - End the session
-- **No anchoring** - votes are hidden until revealed
+- **No anchoring** - votes are hidden until revealed, and can't be changed afterwards
 
 ---
 

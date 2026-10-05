@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
-import { MAX_ROOM_CAPACITY } from "../constants.js";
-import { isRoomExpired } from "../helpers.js";
+import { MAX_NAME_LENGTH, MAX_ROOM_CAPACITY } from "../constants.js";
+import { getRoomExpiresAt, isRoomExpired } from "../helpers.js";
 
 const PlayController = (roomRepository, membersRepository) => ({
   index: (_, res) => {
@@ -48,6 +48,7 @@ const PlayController = (roomRepository, membersRepository) => ({
       room,
       userSession,
       roomUrl,
+      remainingMs: Math.max(0, getRoomExpiresAt(room) - Date.now()),
     });
   },
   join: async (req, res) => {
@@ -74,6 +75,15 @@ const PlayController = (roomRepository, membersRepository) => ({
         layout: "layout",
         room,
         error: "Please enter your name.",
+      });
+      return;
+    }
+
+    if (name.length > MAX_NAME_LENGTH) {
+      res.render("join", {
+        layout: "layout",
+        room,
+        error: `Keep your name to ${MAX_NAME_LENGTH} characters or fewer.`,
       });
       return;
     }
@@ -144,12 +154,18 @@ const PlayController = (roomRepository, membersRepository) => ({
   },
   register: async (req, res) => {
     const adminToken = randomUUID();
+    const adminName = String(req.body.name ?? "").trim().slice(0, MAX_NAME_LENGTH);
+
+    if (!adminName) {
+      res.redirect("/play");
+      return;
+    }
 
     const room = roomRepository.createRoom({
       taskTitle: req.body.taskTitle,
       taskDescription: req.body.taskDescription,
       adminToken: adminToken,
-      adminName: req.body.name,
+      adminName: adminName,
     });
 
     if (!req.session.rooms) {
@@ -157,7 +173,7 @@ const PlayController = (roomRepository, membersRepository) => ({
     }
 
     req.session.rooms[room.id] = {
-      name: req.body.name,
+      name: adminName,
       isAdmin: true,
       adminToken: adminToken,
       joinedAt: Date.now(),

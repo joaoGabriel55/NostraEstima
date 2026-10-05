@@ -1,45 +1,42 @@
-<!-- Create New Room Form -->
-<div id="plan-poker-player-register">
-  <div class="container">
-    <form id="player-register-form" method="post" action="/register">
-      <div class="form-group">
-        <label class="form-label" for="playerName">Your Name</label>
-        <input
-          type="text"
-          id="playerName"
-          name="name"
-          class="form-input"
-          placeholder="Enter your name"
-          required
-          autocomplete="off"
-        />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="taskTitle">Task Title</label>
-        <input
-          type="text"
-          id="taskTitle"
-          class="form-input"
-          placeholder="e.g., Implement user authentication"
-          autocomplete="off"
-          name="taskTitle"
-          required
-        />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="taskDescription">
-          Description / Links
-        </label>
-        <textarea
-          id="taskDescription"
-          class="form-input"
-          name="taskDescription"
-          placeholder="Add any relevant links, Jira tickets, or additional context..."
-        ></textarea>
-      </div>
-      <button type="submit" class="submit-btn">
-        🚀 Start New Poker Room
-      </button>
-    </form>
-  </div>
-</div>
+<section class="sheet sheet-narrow">
+  <h1 class="sheet-title">Open a room</h1>
+  <p class="sheet-lede">One link for the whole team, no sign-up. The room closes itself after 10 minutes.</p>
+
+  <form id="player-register-form" class="form" method="post" action="/register">
+    <div class="field">
+      <label class="field-label" for="playerName">Your name</label>
+      <input
+        type="text"
+        id="playerName"
+        name="name"
+        class="input"
+        placeholder="e.g. Marta"
+        required
+        maxlength="40"
+        autocomplete="off"
+      />
+    </div>
+    <div class="field">
+      <label class="field-label" for="taskTitle">Task title</label>
+      <input
+        type="text"
+        id="taskTitle"
+        class="input"
+        placeholder="e.g. Implement user authentication"
+        autocomplete="off"
+        name="taskTitle"
+        required
+      />
+    </div>
+    <div class="field">
+      <label class="field-label" for="taskDescription">Description or links <span class="field-optional">optional</span></label>
+      <textarea
+        id="taskDescription"
+        class="input"
+        name="taskDescription"
+        placeholder="Jira ticket, acceptance criteria, anything the team should read first"
+      ></textarea>
+    </div>
+    <button type="submit" class="btn btn-primary btn-wide">Start the room</button>
+  </form>
+</section>

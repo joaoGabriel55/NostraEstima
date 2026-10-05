@@ -28,10 +28,20 @@ database.exec(`
     admin_token TEXT NOT NULL,
     admin_name TEXT NOT NULL,
     revealed INTEGER DEFAULT 0,
+    extension_seconds INTEGER NOT NULL DEFAULT 0,
     created_at INTEGER DEFAULT (unixepoch()),
     updated_at INTEGER DEFAULT (unixepoch())
   )
 `);
+
+// Add columns introduced after the first release to existing databases.
+// (There is no migration tool; each addition is guarded here instead.)
+const roomColumns = database.prepare("PRAGMA table_info(rooms)").all();
+if (!roomColumns.some((column) => column.name === "extension_seconds")) {
+  database.exec(
+    "ALTER TABLE rooms ADD COLUMN extension_seconds INTEGER NOT NULL DEFAULT 0",
+  );
+}
 
 // Create the room_members table
 database.exec(`

@@ -9,7 +9,8 @@ import ejsLayouts from "express-ejs-layouts";
 import PlayController from "./src/controllers/play-controller.js";
 import PlayEventsController from "./src/controllers/play-events-controller.js";
 import { respositories } from "./src/repositories/index.js";
-import { ROOM_DURATION_MS } from "./src/constants.js";
+import { MAX_ROOM_LIFETIME_MS, ROOM_DURATION_MS } from "./src/constants.js";
+import { linkify } from "./src/helpers.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -55,7 +56,7 @@ function startCleanupInterval() {
       for (const roomId of expiredRoomIds) {
         // Notify all users in the room
         io.to(roomId).emit("room:expired", {
-          message: "Room has expired after 10 minutes.",
+          message: "This room has closed.",
         });
 
         // Delete the room
@@ -75,7 +76,7 @@ const sessionMiddleware = session({
   cookie: {
     secure: Boolean(process.env.SECRET_KEY), // Set to true in production with HTTPS
     sameSite: "lax", // Required for cookies to work properly in modern browsers
-    maxAge: 10 * 60 * 1000, // 10 minutes
+    maxAge: MAX_ROOM_LIFETIME_MS, // as long as the longest room (with its extension)
   },
 });
 
@@ -93,6 +94,7 @@ app.set("view engine", "ejs");
 app.set("views", join(__dirname, "src/views"));
 app.use(ejsLayouts);
 app.set("layout", "layout");
+app.locals.linkify = linkify;
 
 const playerController = PlayController(roomRepository, membersRepository);
 

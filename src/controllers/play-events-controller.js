@@ -1,5 +1,13 @@
-import { DISCONNECT_GRACE_PERIOD_MS, MAX_ROOM_CAPACITY } from "../constants.js";
 import {
+  DECK_VALUES,
+  DISCONNECT_GRACE_PERIOD_MS,
+  EXTEND_WINDOW_MS,
+  MAX_ROOM_CAPACITY,
+  ROOM_EXTENSION_MS,
+} from "../constants.js";
+import {
+  getRoomAverage,
+  getRoomExpiresAt,
   getSanitizedMembers,
   getSanitizedRoom,
   isRoomExpired,
@@ -23,7 +31,7 @@ const PlayEventsController = (
     if (isRoomExpired(room)) {
       // Notify all users in the room that it has expired
       io.to(roomId).emit("room:expired", {
-        message: "Room has expired after 10 minutes.",
+        message: "This room has closed.",
       });
       roomRepository.deleteRoom(roomId);
       console.log(`Room ${roomId} expired and deleted.`);
@@ -200,6 +208,10 @@ const PlayEventsController = (
       isReconnecting: isReconnecting,
       isNewUser: isNewUser,
       previousVote: freshRoom.revealed ? member.point : member.point !== null,
+      // The member's own vote, so a reload can restore their selected card.
+      myVote: member.point,
+      // Lets the client correct for a skewed local clock when counting down.
+      serverNow: Date.now(),
     });
 
     // Notify others
@@ -223,24 +235,40 @@ const PlayEventsController = (
   });
 
   // Submit vote
-  socket.on("vote:submit", async ({ roomId, point }) => {
+  socket.on("vote:submit", async ({ roomId, point }, ack) => {
+    // Clients that pass an ack get the outcome there; older clients get room:error.
+    const reply = typeof ack === "function" ? ack : () => {};
+    const fail = (message) => {
+      if (typeof ack === "function") {
+        ack({ ok: false, message });
+      } else {
+        socket.emit("room:error", { message });
+      }
+    };
+
     if (checkRoomExpiration(roomId)) {
-      socket.emit("room:error", {
-        message: "Room not found or has expired.",
-      });
+      fail("Room not found or has expired.");
       return;
     }
 
     const member = membersRepository.getMemberBySocket(roomId, socket.id);
     if (!member) {
-      socket.emit("room:error", {
-        message: "You are not a member of this room.",
-      });
+      fail("You are not a member of this room.");
+      return;
+    }
+
+    if (roomRepository.getRoom(roomId).revealed) {
+      fail("Votes are already revealed. Wait for the next round.");
+      return;
+    }
+
+    if (!DECK_VALUES.includes(Number(point))) {
+      fail("That card isn't in the deck.");
       return;
     }
 
     // Update the vote
-    membersRepository.updateMemberPoint(member.id, point);
+    membersRepository.updateMemberPoint(member.id, Number(point));
 
     // Get fresh room data
     const room = roomRepository.getRoom(roomId);
@@ -251,9 +279,57 @@ const PlayEventsController = (
       voterName: member.name,
     });
 
+    reply({ ok: true, point: Number(point) });
+
     console.log(
       `[vote:submit] ${member.name} voted ${point} in room ${roomId}`,
     );
+  });
+
+  // Extend the room once, in its last minutes (admin only)
+  socket.on("room:extend", async ({ roomId }, ack) => {
+    const reply = typeof ack === "function" ? ack : () => {};
+
+    if (checkRoomExpiration(roomId)) {
+      reply({ ok: false, message: "Room not found or has expired." });
+      return;
+    }
+
+    const room = roomRepository.getRoom(roomId);
+    if (!room) {
+      reply({ ok: false, message: "Room not found." });
+      return;
+    }
+
+    const userSession = socket.handshake.session?.rooms?.[roomId];
+    if (!userSession?.isAdmin || userSession?.adminToken !== room.adminToken) {
+      reply({ ok: false, message: "Only the facilitator can extend the room." });
+      return;
+    }
+
+    if (room.extensionMs > 0) {
+      reply({ ok: false, message: "This room has already been extended." });
+      return;
+    }
+
+    if (getRoomExpiresAt(room) - Date.now() > EXTEND_WINDOW_MS) {
+      reply({
+        ok: false,
+        message: "You can add time in the room's last 2 minutes.",
+      });
+      return;
+    }
+
+    roomRepository.extendRoom(roomId, ROOM_EXTENSION_MS / 1000);
+    const freshRoom = roomRepository.getRoom(roomId);
+
+    io.to(roomId).emit("room:extended", {
+      expiresAt: getRoomExpiresAt(freshRoom),
+      serverNow: Date.now(),
+    });
+    reply({ ok: true });
+
+    console.log(`[room:extend] Room ${roomId} extended by 5 minutes.`);
   });
 
   // Reveal votes (admin only)
@@ -288,17 +364,7 @@ const PlayEventsController = (
     // Get fresh room data
     const freshRoom = roomRepository.getRoom(roomId);
 
-    // Calculate average (only for numeric votes)
-    const numericVotes = freshRoom.members
-      .filter((m) => m.point !== null && typeof m.point === "number")
-      .map((m) => m.point);
-
-    const average =
-      numericVotes.length > 0
-        ? (
-            numericVotes.reduce((a, b) => a + b, 0) / numericVotes.length
-          ).toFixed(1)
-        : null;
+    const average = getRoomAverage(freshRoom);
 
     // Send revealed data to all users
     io.to(roomId).emit("votes:revealed", {
