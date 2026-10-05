@@ -12,10 +12,14 @@ const RoomRepository = (database, membersRepository) => {
     UPDATE rooms SET revealed = ?, updated_at = unixepoch() WHERE id = ?
   `);
 
+  const extendRoomStmt = database.prepare(`
+    UPDATE rooms SET extension_seconds = ?, updated_at = unixepoch() WHERE id = ?
+  `);
+
   const deleteRoomStmt = database.prepare("DELETE FROM rooms WHERE id = ?");
 
   const selectExpiredRoomsStmt = database.prepare(`
-    SELECT id FROM rooms WHERE created_at < ?
+    SELECT id FROM rooms WHERE created_at + extension_seconds < ?
   `);
 
   function createRoom({ taskTitle, taskDescription, adminToken, adminName }) {
@@ -40,6 +44,7 @@ const RoomRepository = (database, membersRepository) => {
       adminToken,
       adminName,
       revealed: false,
+      extensionMs: 0,
       createdAt: now * 1000, // Convert back to milliseconds for compatibility
       members: [],
     };
@@ -61,6 +66,7 @@ const RoomRepository = (database, membersRepository) => {
       adminToken: room.admin_token,
       adminName: room.admin_name,
       revealed: Boolean(room.revealed),
+      extensionMs: (room.extension_seconds || 0) * 1000,
       createdAt: room.created_at * 1000, // Convert to milliseconds
       members,
     };
@@ -74,6 +80,13 @@ const RoomRepository = (database, membersRepository) => {
   }
 
   /**
+   * Record a room's time extension (in seconds)
+   */
+  function extendRoom(roomId, extensionSeconds) {
+    extendRoomStmt.run(extensionSeconds, roomId);
+  }
+
+  /**
    * Delete a room and all its members
    */
   function deleteRoom(roomId) {
@@ -82,7 +95,7 @@ const RoomRepository = (database, membersRepository) => {
   }
 
   /**
-   * Get all expired rooms (older than specified milliseconds)
+   * Get all expired rooms (older than specified milliseconds, plus any extension)
    */
   function getExpiredRooms(maxAgeMs) {
     const cutoffTime = Math.floor((Date.now() - maxAgeMs) / 1000);
@@ -98,6 +111,7 @@ const RoomRepository = (database, membersRepository) => {
     createRoom,
     getRoom,
     setRoomRevealed,
+    extendRoom,
     deleteRoom,
     getExpiredRooms,
     roomExists,
