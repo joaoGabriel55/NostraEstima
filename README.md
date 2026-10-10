@@ -1,6 +1,6 @@
-# 🃏 NostraEstima
+# 🃏 PokerEstima
 
-<img width="1440" alt="NostraEstima room after the reveal: player plaques with their votes, the average 7.2 and the split" src="docs/screenshots/room-desktop.png" />
+<img width="1440" alt="PokerEstima room after the reveal: player plaques with their votes, the average 7.2 and the split" src="docs/screenshots/room-desktop.png" />
 
 <img width="390" alt="The same room on a phone, beside a video call" src="docs/screenshots/room-mobile.png" />
 
@@ -39,8 +39,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/joaoGabriel55/NostraEstima.git
-cd NostraEstima
+git clone https://github.com/joaoGabriel55/PokerEstima.git
+cd PokerEstima
 
 # Install dependencies
 npm install
@@ -133,7 +133,7 @@ Shortcuts are ignored while you're typing in a field.
 ## 📁 Project Structure
 
 ```
-NostraEstima/
+PokerEstima/
 ├── server.js                  # Express + Socket.io server, room cleanup
 ├── db/index.js                # SQLite connection and schema
 ├── src/
@@ -144,7 +144,7 @@ NostraEstima/
 │   └── views/                 # EJS layout and pages
 ├── public/
 │   ├── script.js              # Client-side logic
-│   ├── styles.css             # The NostraEstima visual system
+│   ├── styles.css             # The PokerEstima visual system
 │   └── fonts/                 # Self-hosted Marcellus and Archivo
 ├── DESIGN.md                  # Design system
 ├── PRODUCT.md                 # Product context

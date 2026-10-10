@@ -1,5 +1,5 @@
 ---
-name: NostraEstima
+name: PokerEstima
 description: Real-time planning poker for teams on a call, set in Barcelona's street plaques and Eixample chamfers.
 colors:
   terracotta: "#b4512f"
@@ -177,7 +177,7 @@ components:
     height: "48px"
 ---
 
-# Design System: NostraEstima
+# Design System: PokerEstima
 
 ## Overview
 
@@ -224,7 +224,7 @@ The panot pavement and the enamel plaque form a stone-and-ink base. Terracotta o
 
 ### Dark theme: "Nit a l'Eixample"
 
-The same street after dark, composed rather than inverted. It follows `prefers-color-scheme` unless the rail toggle has set a theme. The choice is stored in `localStorage` (`nostraestima-theme`) and applied by an inline script in `<head>` before first paint. A choice that matches the system is forgotten, so the page follows the system again. The toggle is a 40px bevelled plate with an `--on-color` rim (36px at ≤480px). It shows a moon in light and a sun in dark.
+The same street after dark, composed rather than inverted. It follows `prefers-color-scheme` unless the rail toggle has set a theme. The choice is stored in `localStorage` (`pokerestima-theme`) and applied by an inline script in `<head>` before first paint. A choice that matches the system is forgotten, so the page follows the system again. The toggle is a 40px bevelled plate with an `--on-color` rim (36px at ≤480px). It shows a moon in light and a sun in dark.
 
 These are the `night-*` and `lamplight*` keys in the frontmatter.
 
@@ -255,7 +255,7 @@ Shadows go black and deeper (`--drop-hover`, `--drop-selected`, `--shadow-toast`
 
 ### Hierarchy
 - **Display** (Marcellus 400, clamp(2rem, 5vw, 2.5rem), 1.1, uppercase): sheet titles on the create and join pages ("Open a room", "Join the room").
-- **Wordmark** (Marcellus 400, 1.5rem, 0.08em, uppercase): "NOSTRAESTIMA" in the rail; 1.25rem at ≤480px.
+- **Wordmark** (Marcellus 400, 1.5rem, 0.08em, uppercase): "POKERESTIMA" in the rail; 1.25rem at ≤480px.
 - **Headline** (Archivo 700, clamp(1.625rem, 3.4vw, 2.375rem), 1.15, -0.02em): the task title, the largest text in a room.
 - **Title** (Marcellus 400, 1.125rem, 0.06em, uppercase): player names on plaques; 1rem at ≤760px.
 - **Body** (Archivo 400, 1rem, 1.5): descriptions and ledes, with descriptions capped at 70ch and `pre-wrap`.
@@ -341,7 +341,7 @@ A white playing card with a 3:4 bevelled face and a 2px ink rim.
 - **Labels:** sentence case, with "optional" in faded ink.
 
 ### Rail & Countdown
-- **Rail:** the full-width terracotta band. It holds a flag with an enamel keyline, the NOSTRAESTIMA wordmark linking to `/play`, and the tagline in enamel. Focus rings inside the rail are `--on-color`, because a terracotta ring would vanish into it.
+- **Rail:** the full-width terracotta band. It holds a flag with an enamel keyline, the POKERESTIMA wordmark linking to `/play`, and the tagline in enamel. Focus rings inside the rail are `--on-color`, because a terracotta ring would vanish into it.
 - **Theme toggle:** the last item in the rail, a 40px bevelled plate (36px at ≤480px) with a 2px `--on-color` rim and a 20px stroked icon: a moon in light, a sun in dark (the theme it switches to). Hover fills it `--on-color` with the icon in the rail colour. Its accessible name reads "Switch to dark theme" or "Switch to light theme".
 - **Countdown:** an enamel plaque with an ink rim, showing "Closes in" plus tabular mm:ss. Under 2 minutes the face turns groc and the digits vermell. It counts down to the room's real expiry from the server (corrected for local clock skew), so late joiners and reloads see the true time; at 0:00 the label reads "Closing" until the server closes the room.
 

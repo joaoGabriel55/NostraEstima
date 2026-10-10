@@ -12,7 +12,7 @@ Agile/Scrum teams estimating stories together during a live remote call (refinem
 
 ## Product Purpose
 
-NostraEstima runs a single round-based planning-poker session in real time: the facilitator names the task, the team picks cards privately, the facilitator reveals, the team discusses outliers and re-votes or moves on. Success is a team reaching an estimate without anyone signing up, installing anything, or being anchored by someone else's vote.
+PokerEstima runs a single round-based planning-poker session in real time: the facilitator names the task, the team picks cards privately, the facilitator reveals, the team discusses outliers and re-votes or moves on. Success is a team reaching an estimate without anyone signing up, installing anything, or being anchored by someone else's vote.
 
 ## Positioning
 
@@ -43,7 +43,7 @@ Zero-friction and ephemeral. No accounts, no workspace, no history: one link, a 
 
 ## Brand Commitments
 
-- Canonical name is **NostraEstima**; the UI and page title use it. The README still says "PokerEstima".
+- Canonical name is **PokerEstima**; the UI, page title and README use it.
 - The flag logo (`public/flag.svg`, yellow field with red horizontal stripes) is a kept brand asset.
 - The emoji card meanings stay on the cards (as a secondary mark); the tagline is "Estimate your tasks with fun!"
 - Catalan identity: the visual world draws on Barcelona/Catalan references, kept minimal (user commitment, 2026-10-04).

@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#b4512f" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#6a2b16" media="(prefers-color-scheme: dark)" />
-    <title>NostraEstima</title>
+    <title>PokerEstima</title>
     <script>
       // Theme before first paint: follow the system unless the rail toggle chose one.
       // A choice that matches the system is forgotten, so the page follows it again.
       (function () {
-        var KEY = "nostraestima-theme";
+        var KEY = "pokerestima-theme";
         var COLORS = { light: "#b4512f", dark: "#6a2b16" };
         var root = document.documentElement;
         var system = window.matchMedia("(prefers-color-scheme: dark)");
@@ -74,9 +74,9 @@
   <body>
     <header class="rail">
       <div class="rail-inner">
-        <a class="wordmark" href="/play" aria-label="NostraEstima, start a new room">
+        <a class="wordmark" href="/play" aria-label="PokerEstima, start a new room">
           <img class="wordmark-flag" src="/public/flag.svg" alt="" width="36" height="24" />
-          <span class="wordmark-name">NostraEstima</span>
+          <span class="wordmark-name">PokerEstima</span>
         </a>
         <p class="rail-tagline">Estimate your tasks with fun!</p>
         <div class="rail-slot"><%- defineContent('rail') %></div>
