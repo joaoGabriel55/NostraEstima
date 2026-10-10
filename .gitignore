@@ -6,3 +6,14 @@ data/
 *.db-journal
 *.db-wal
 *.db-shm
+
+# Local AI agent tooling
+.agents/
+.claude/
+.codex/
+.github/agents/
+.github/hooks/
+.github/skills/
+.impeccable/
+.playwright-mcp/
+skills-lock.json
